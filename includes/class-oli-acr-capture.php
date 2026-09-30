@@ -60,6 +60,8 @@ class OLI_ACR_Capture {
 				'endpoint' => WC_AJAX::get_endpoint( 'oli_acr_capture' ),
 				'nonce'    => wp_create_nonce( 'oli_acr_capture' ),
 				'consent'  => 'consent' === oli_acr_get_setting( 'guest_tracking' ) && ! is_user_logged_in() ? 1 : 0,
+				// Langue de la page (l'appel wc-ajax ne passe pas toujours par l'URL de la langue).
+				'lang'     => OLI_ACR_Lang::current_language(),
 				'delay'    => 800,
 			)
 		);
@@ -147,6 +149,7 @@ class OLI_ACR_Capture {
 			wp_send_json_error( array( 'reason' => 'empty_cart' ) );
 		}
 
+		$language   = isset( $_POST['lang'] ) ? OLI_ACR_Lang::normalize( sanitize_text_field( wp_unslash( $_POST['lang'] ) ) ) : '';
 		self::$busy = true;
 		$id         = OLI_ACR_Carts::upsert_current(
 			array(
@@ -156,6 +159,7 @@ class OLI_ACR_Capture {
 				'last_name'  => isset( $_POST['last_name'] ) ? sanitize_text_field( wp_unslash( $_POST['last_name'] ) ) : '',
 				'consent'    => $user_id ? true : ( 'consent' === $mode ? $consent : true ),
 				'user_id'    => $user_id,
+				'language'   => $language,
 			)
 		);
 		self::$busy = false;

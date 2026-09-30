@@ -337,7 +337,7 @@ def main():
     expected = php('echo oli_acr_default_consent_text();')
     other_txt = php('echo oli_acr_in_locale("' + OTHER + '", "oli_acr_default_consent_text");')
     _, sp, _, _ = ca.req('/wp-admin/admin.php?page=oli-acr&tab=settings')
-    ta = re.search(r'<textarea name="s\[consent_text\]"[^>]*>(.*?)</textarea>', sp, re.S)
+    ta = re.search(r'<textarea[^>]*name="s\[consent_texts\]\[' + LOCALE + r'\]"[^>]*>(.*?)</textarea>', sp, re.S)
     php('$s = get_option("oli_acr_settings"); $s["guest_tracking"] = "consent"; update_option("oli_acr_settings", $s);')
     cb3 = Client(); cb3.req('/?add-to-cart=10'); _, chk, _, _ = cb3.req('/checkout-classique/')
     php('$s = get_option("oli_acr_settings"); $s["guest_tracking"] = "always"; $s["consent_text"] = ""; update_option("oli_acr_settings", $s);')
@@ -415,6 +415,8 @@ def main():
     # B2 : désinstallation complète (option « garder les données » d'abord, puis nettoyage réel).
     php('$o = wc_get_order(' + str(oid) + '); $o->update_meta_data("_wc_other/oli-acr/consent", "1"); $o->save(); update_user_meta(1, "_wc_other/oli-acr/consent", "1");')
     php('global $wpdb; $wpdb->insert($wpdb->prefix."woocommerce_sessions", array("session_key"=>"oli-e2e-' + stamp + '","session_value"=>maybe_serialize(array("cart"=>"a:0:{}","oli_acr_cart_id"=>"5","oli_acr_cart_hash"=>"x")),"session_expiry"=>time()+3600));')
+    # N2 : session réelle du checkout en blocs, case cochée => customer.meta_data[] « _wc_other/oli-acr/consent » (double sérialisation).
+    php('global $wpdb; $c = array("id"=>"0","email"=>"n2-' + stamp + '@example.com","country"=>"CA","meta_data"=>array(array("key"=>"_wc_other/oli-acr/consent","value"=>"1"),array("key"=>"_wc_other/autre/champ","value"=>"garde"))); $wpdb->insert($wpdb->prefix."woocommerce_sessions", array("session_key"=>"oli-n2-' + stamp + '","session_value"=>maybe_serialize(array("cart"=>maybe_serialize(array()),"customer"=>maybe_serialize($c))),"session_expiry"=>time()+3600));')
     unused = php('$c = new WC_Coupon(); $c->set_code("OLI-UNUSED' + stamp + '"); $c->set_amount(5); $c->update_meta_data("_oli_acr_coupon","yes"); echo $c->save();')
     used = php('$c = new WC_Coupon(); $c->set_code("OLI-USED' + stamp + '"); $c->set_amount(5); $c->set_usage_count(1); $c->update_meta_data("_oli_acr_coupon","yes"); echo $c->save();')
     php('oli_acr_log("e2e : test du journal"); do_action("oli_acr_daily_cleanup");')
@@ -443,12 +445,17 @@ def main():
         'post_meta': q("SELECT COUNT(*) FROM wp_postmeta WHERE meta_key LIKE '%oli_acr%' OR meta_key LIKE '%oli-acr/%'"),
         'user_meta': q("SELECT COUNT(*) FROM wp_usermeta WHERE meta_key LIKE '%oli_acr%' OR meta_key LIKE '%oli-acr/%'"),
         'sessions': q("SELECT COUNT(*) FROM wp_woocommerce_sessions WHERE session_value LIKE '%oli_acr_%'"),
+        'sessions_consent_n2': q("SELECT COUNT(*) FROM wp_woocommerce_sessions WHERE session_value LIKE '%oli-acr/%'"),
         'cap': q("SELECT COUNT(*) FROM wp_options WHERE option_name = 'wp_user_roles' AND option_value LIKE '%oli_acr_manage%'"),
         'unused_coupon': q(f"SELECT COUNT(*) FROM wp_posts WHERE ID = {unused}"),
         'used_coupon_kept': q(f"SELECT COUNT(*) FROM wp_posts WHERE ID = {used}"),
     }
+    n2_session = php('global $wpdb; $v = maybe_unserialize($wpdb->get_var("SELECT session_value FROM {$wpdb->prefix}woocommerce_sessions WHERE session_key = \'oli-n2-' + stamp + '\'")); $c = is_array($v) ? maybe_unserialize($v["customer"]) : null; echo is_array($c) ? $c["email"] . "|" . wp_json_encode($c["meta_data"]) : "ILLISIBLE";')
     wp('plugin', 'activate', 'oli-abandoned-cart-recovery')
     zero = all(v == '0' for k, v in res.items() if k != 'used_coupon_kept')
+    result('(N2) Désinstallation : « _wc_other/oli-acr/consent » retiré des sessions WooCommerce (sérialisées), le reste intact',
+           res['sessions_consent_n2'] == '0' and n2_session.startswith('n2-' + stamp + '@example.com|') and 'autre\\/champ' in n2_session and 'oli-acr' not in n2_session,
+           f'restant={res["sessions_consent_n2"]} session={n2_session}')
     result('(B2) Désinstallation : option « garder les données », puis aucun résidu (sauf coupons utilisés, documenté)',
            kept == ['2', '1'] and zero and res['used_coupon_kept'] == '1' and int(logs_before) > 0 and len(files_before) > 0,
            f'garder={kept} avant: logs_AS={logs_before} fichiers={len(files_before)} après={res}')

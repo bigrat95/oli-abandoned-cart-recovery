@@ -20,6 +20,8 @@ class OLI_ACR_Install {
 	 * @return void
 	 */
 	public static function activate() {
+		// Les textes par défaut des modèles sont créés dans chaque langue : il faut les traductions du plugin.
+		oli_acr_load_textdomain();
 		self::create_tables();
 		self::add_caps();
 		if ( false === get_option( 'oli_acr_settings' ) ) {
@@ -31,6 +33,7 @@ class OLI_ACR_Install {
 		if ( false === get_option( 'oli_acr_blocklist' ) ) {
 			add_option( 'oli_acr_blocklist', array(), '', false );
 		}
+		self::migrate();
 		// La planification est (re)créée au prochain chargement.
 		delete_option( 'oli_acr_schedule_signature' );
 	}
@@ -55,6 +58,44 @@ class OLI_ACR_Install {
 			self::create_tables();
 			self::add_caps();
 		}
+		if ( get_option( 'oli_acr_version' ) !== OLI_ACR_VERSION ) {
+			self::migrate();
+		}
+		// Une langue ajoutée au site reçoit les textes par défaut des modèles non modifiés.
+		$signature = md5( implode( ',', OLI_ACR_Lang::languages() ) . '|' . OLI_ACR_Lang::adapter()->id() );
+		if ( get_option( 'oli_acr_languages_signature' ) !== $signature ) {
+			OLI_ACR_Templates::sync_languages();
+			update_option( 'oli_acr_languages_signature', $signature, false );
+		}
+	}
+
+	/**
+	 * Migration vers les textes par langue (1.1.0).
+	 *
+	 * - Modèles : les textes de la 1.0.x deviennent ceux de la langue de repli ; un modèle par défaut
+	 *   non modifié reçoit ses textes dans chaque langue active (sync_languages()).
+	 * - Consentement : un texte personnalisé devient celui de la langue de repli.
+	 * Idempotente : peut être relancée sans effet de bord.
+	 *
+	 * @return void
+	 */
+	public static function migrate() {
+		$settings = get_option( 'oli_acr_settings' );
+		if ( is_array( $settings ) ) {
+			$texts    = isset( $settings['consent_texts'] ) && is_array( $settings['consent_texts'] ) ? $settings['consent_texts'] : array();
+			$fallback = OLI_ACR_Lang::fallback_language();
+			$legacy   = isset( $settings['consent_text'] ) ? (string) $settings['consent_text'] : '';
+			if ( '' !== trim( $legacy ) && ! oli_acr_is_default_consent_text( $legacy ) && empty( $texts[ $fallback ] ) ) {
+				$texts[ $fallback ] = $legacy;
+			}
+			$settings['consent_texts'] = $texts;
+			if ( ! isset( $settings['fallback_language'] ) ) {
+				$settings['fallback_language'] = '';
+			}
+			update_option( 'oli_acr_settings', $settings, false );
+		}
+		OLI_ACR_Templates::sync_languages();
+		update_option( 'oli_acr_version', OLI_ACR_VERSION, false );
 	}
 
 	/**

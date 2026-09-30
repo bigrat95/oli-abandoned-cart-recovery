@@ -19,10 +19,27 @@ Extension WooCommerce légère de récupération des **paniers abandonnés** et 
 - Choix des rôles suivis.
 - Photo du panier : produits, quantités, variations, total, devise et langue, reliée à la session WooCommerce et à un jeton de 32 caractères.
 
+### Multilingue (1.1.0)
+- **Adaptateurs** (`includes/lang/`) : classe de base `OLI_ACR_Lang_Adapter` ; `OLI_ACR_Lang_WPML`, `_Polylang`, `_TranslatePress`, `_Weglot`, `_Core`. Priorité : WPML, Polylang, TranslatePress, Weglot, puis le cœur. Filtre `oli_acr_lang_adapters` pour en ajouter ou en retirer. Toutes les langues sont des locales WordPress (`fr_CA`, `en_US`).
+- **Modèles par langue** : `texts[locale] = {name, subject, heading, content, button_label}` ; les champs de premier niveau sont le miroir de la langue de repli (compatibilité 1.0.x et filtres). Délai, coupon, type et statut sont communs.
+- **Consentement par langue** : réglage `consent_texts[locale]` (`consent_text` = miroir de la langue de repli).
+- **Langue de repli** : réglage `fallback_language` (vide = langue par défaut du site ou de l'extension).
+- **Ordre de priorité, champ par champ** (`OLI_ACR_Templates::for_locale()`, `oli_acr_consent_text()`) :
+  1. texte saisi dans l'onglet de la langue ;
+  2. traduction WPML String Translation / Polylang de la chaîne de la langue de repli (domaine / groupe `oli-abandoned-cart-recovery` / « Oli Abandoned Cart Recovery », noms `oli_acr_{id}_{champ}` et `oli_acr_consent_text`) ;
+  3. texte par défaut traduit dans la langue (si le champ de repli est encore celui par défaut et si le plugin a cette traduction) ;
+  4. texte de la langue de repli.
+- **Langue du panier** : transmise par la page (`oliAcrCapture.lang`, calculée au rendu de la page de paiement), car l'appel `wc-ajax` ne passe pas toujours par l'URL de la langue.
+- **Liens** : récupération et désabonnement construits sur l'accueil de la langue (`OLI_ACR_Lang::home_url()`), redirection vers la page de paiement de la langue (`OLI_ACR_Lang::checkout_url()`, page traduite avec WPML / Polylang), page de désabonnement affichée dans la langue (`oli_acr_lang`). Filtre `oli_acr_translate_url`.
+- **Migration 1.0.x → 1.1.0** (`OLI_ACR_Install::migrate()`, idempotente) : textes existants = textes de la langue de repli ; modèles par défaut non modifiés = textes par défaut dans chaque langue active ; une langue ajoutée plus tard est remplie de la même façon.
+- **Polylang + WooCommerce** : pour que la page de paiement traduite soit reconnue comme page de paiement, il faut « Polylang for WooCommerce » (ou l'équivalent du filtre `woocommerce_get_checkout_page_id`).
+- **Weglot** traduit le HTML à la volée et n'a pas de module de chaînes : utilisez les onglets de langue.
+
 ### Relances
 - Plusieurs modèles, chacun avec délai, sujet, en-tête, adresse de réponse, contenu, libellé du bouton et statut actif/inactif, envoyés en séquence.
 - Balises : `{first_name}`, `{last_name}`, `{full_name}`, `{email}`, `{cart_items}`, `{cart_total}`, `{recovery_link}`, `{recovery_button}`, `{coupon}`, `{coupon_code}`, `{unsubscribe_link}`, `{site_name}`, `{site_url}`, `{order_number}`, `{order_date}`.
-- Envoi dans la langue enregistrée avec le panier (`switch_to_locale()` / `restore_previous_locale()`). Les modèles par défaut restent traduisibles et sont rendus dans cette langue tant que l'admin ne les a pas modifiés ; un modèle modifié part tel qu'écrit (pas de modèle distinct par langue).
+- Envoi dans la langue enregistrée avec le panier (locale WordPress et langue de l'extension multilingue), voir « Multilingue » ci-dessous.
+- Balise `{coupon_amount}` (rabais formaté) ; les modèles par défaut ont une phrase d'introduction traduisible avant le code, retirée s'il n'y a pas de coupon.
 - Gabarit WooCommerce (`WC()->mailer()->wrap_message()` + `WC_Emails::send()`), en-têtes `List-Unsubscribe` et `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058).
 - Coupons uniques (préfixe, pourcentage ou montant fixe, validité, usage unique, restreints au courriel du client), appliqués automatiquement au clic, puis mis à la corbeille une fois utilisés ou expirés.
 - Commandes en attente : modèles dédiés, délai de départ, lien « payer la commande », annulation automatique des vieilles commandes relancées.

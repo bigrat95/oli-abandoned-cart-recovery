@@ -9,3 +9,4 @@ Thumbs.db
 composer.lock
 tests/e2e-results-*.json
 !tests/e2e-run-*.log
+__pycache__/

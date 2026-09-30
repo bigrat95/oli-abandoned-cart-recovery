@@ -3,7 +3,7 @@
  * Plugin Name: Oli Abandoned Cart Recovery
  * Plugin URI: https://github.com/bigrat95/oli-abandoned-cart-recovery
  * Description: Lightweight abandoned cart and pending order recovery for WooCommerce. Captures the checkout email as soon as it is typed (classic and block checkout), sends a sequence of reminder emails with unique coupons, and tracks recovered sales.
- * Version: 1.0.1
+ * Version: 1.1.0
  * Requires at least: 6.4
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
@@ -23,7 +23,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'OLI_ACR_VERSION', '1.0.1' );
+define( 'OLI_ACR_VERSION', '1.1.0' );
 define( 'OLI_ACR_DB_VERSION', '1.0.0' );
 define( 'OLI_ACR_FILE', __FILE__ );
 define( 'OLI_ACR_DIR', plugin_dir_path( __FILE__ ) );
@@ -32,6 +32,7 @@ define( 'OLI_ACR_BASENAME', plugin_basename( __FILE__ ) );
 define( 'OLI_ACR_CAP', 'oli_acr_manage' );
 
 require_once OLI_ACR_DIR . 'includes/functions.php';
+require_once OLI_ACR_DIR . 'includes/class-oli-acr-lang.php';
 require_once OLI_ACR_DIR . 'includes/class-oli-acr-install.php';
 require_once OLI_ACR_DIR . 'includes/class-oli-acr-carts.php';
 require_once OLI_ACR_DIR . 'includes/class-oli-acr-templates.php';
@@ -67,7 +68,8 @@ function oli_acr_boot() {
 	}
 
 	add_action( 'init', 'oli_acr_load_textdomain' );
-	OLI_ACR_Install::maybe_upgrade();
+	OLI_ACR_Lang::init();
+	add_action( 'init', array( 'OLI_ACR_Install', 'maybe_upgrade' ), 20 );
 	OLI_ACR_Capture::init();
 	OLI_ACR_Scheduler::init();
 	OLI_ACR_Recovery::init();

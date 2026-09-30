@@ -58,7 +58,8 @@
 			phone: val( SELECTORS.phone ),
 			first_name: val( SELECTORS.first ),
 			last_name: val( SELECTORS.last ),
-			consent: needConsent ? ( consentGiven() ? '1' : '0' ) : '1'
+			consent: needConsent ? ( consentGiven() ? '1' : '0' ) : '1',
+			lang: cfg.lang || document.documentElement.lang || ''
 		};
 		var payload = JSON.stringify( data );
 		if ( payload === lastPayload ) {

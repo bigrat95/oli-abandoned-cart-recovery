@@ -1,10 +1,10 @@
 === Oli Abandoned Cart Recovery ===
 Contributors: bigrat95
-Tags: abandoned cart, woocommerce, cart recovery, pending orders, coupons
+Tags: abandoned cart, woocommerce, cart recovery, pending orders, multilingual
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.1
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -25,6 +25,15 @@ It works with the **classic checkout** and the **block checkout**, is compatible
 * **Consent first (default)** — for guests, nothing is saved (no email, phone or cart) until they tick the consent checkbox under the email field (classic and block checkout). The default text follows each visitor's language; you can replace it with your own
 * **Tracked roles** — all users or only the roles you choose
 * **Cart snapshot** — products, quantities, variations, total, currency and language, linked to the WooCommerce session and a secure token
+
+= Multilingual =
+
+* **Templates per language** — each template has its own texts (name, subject, heading, content, button) for every active language, edited in language tabs; delay, coupon and status are shared
+* **Consent text per language**
+* **Works with** TranslatePress, Polylang, WPML and Weglot (and a single-language site); other plugins can be added with the `oli_acr_lang_adapters` filter
+* **Sent in the cart's language** — the language of the checkout page is saved with the cart; recovery and unsubscribe links point to the URL of that language, and the recovery link opens the checkout page of that language
+* **Adjustable fallback language** for carts in an unknown or deactivated language
+* **WPML String Translation and Polylang strings** — texts of the fallback language are registered, so they can also be translated there
 
 = Reminders =
 
@@ -72,6 +81,23 @@ It works with the **classic checkout** and the **block checkout**, is compatible
 5. Click **Send a test** to check the email
 
 == Frequently Asked Questions ==
+
+= Is it compatible with multilingual plugins? =
+
+Yes: TranslatePress, Polylang, WPML and Weglot are detected automatically (in that order of priority: WPML, Polylang, TranslatePress, Weglot, then WordPress itself). The language of the checkout page is saved with the cart, the reminder is sent in that language, and its links open the store in that language. Under Abandoned Carts > Email templates, each template has one tab per active language.
+
+= Which text is used for a language? =
+
+For each field, in this order: the text written in that language's tab; the WPML String Translation or Polylang string translation of the fallback language text; the default text translated in that language (if the fallback text is still the default one); then the fallback language text. The same order applies to the consent text.
+
+= What is the fallback language? =
+
+The language used when a cart's language is unknown or no longer active, and for texts missing in a language. By default it is the site's default language (or the multilingual plugin's default language); you can change it in Settings.
+
+= How do I add another multilingual plugin? =
+
+Extend the `OLI_ACR_Lang_Adapter` class (languages, current language, URL conversion, optional string translation) and add an instance with the `oli_acr_lang_adapters` filter.
+
 
 = Does it capture guests who never place an order? =
 
@@ -127,6 +153,19 @@ The plugin stores, in the store's own database: the email, phone, first and last
 
 == Changelog ==
 
+= 1.1.0 =
+* New: templates and consent text per language, edited in language tabs; default templates are created in every active language
+* New: language adapters for TranslatePress, Polylang, WPML, Weglot and WordPress core, with the `oli_acr_lang_adapters` filter to add others
+* New: reminders sent in the cart's language (language of the checkout page); recovery and unsubscribe links use the URL of that language, the recovery link opens the checkout page of that language, and the unsubscribe page is shown in that language
+* New: adjustable fallback language
+* New: fallback language texts registered in WPML String Translation and Polylang; documented priority order
+* New: `{coupon_amount}` placeholder and a translatable coupon introduction sentence in the default templates (removed when there is no coupon)
+* New: `oli_acr_translate_url` filter
+* Fix: with the site in English, the admin showed template names, subjects and content in French (list, editor, log, "Send a test"); the admin now shows templates in the admin language or in the selected language tab, and "Send a test" uses that language
+* Fix: uninstall also removes the block checkout consent value (`_wc_other/oli-acr/consent`) stored in the customer data of WooCommerce sessions
+* Upgrade: 1.0.x templates and consent text become the fallback language texts; unchanged default templates get their texts in every active language
+
+
 = 1.0.1 =
 * Privacy: guests are now captured only with explicit consent by default (Quebec Law 25, GDPR); without consent, no email, phone or cart is sent or saved
 * Fix: "Send next reminder now" refuses recovered, unsubscribed or finished carts; nonces are tied to each cart and order, and the sequence continues after a manual send
@@ -155,6 +194,10 @@ The plugin stores, in the store's own database: the email, phone, first and last
 * French (Canada) and French (France) translations
 
 == Upgrade Notice ==
+
+= 1.1.0 =
+Multilingual templates and consent text (TranslatePress, Polylang, WPML, Weglot). Existing texts are kept as the fallback language texts.
+
 
 = 1.0.1 =
 New installs capture guests only with consent (Law 25). Several fixes: manual send, uninstall clean-up, reminder language, one-click unsubscribe.

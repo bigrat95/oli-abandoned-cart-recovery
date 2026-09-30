@@ -24,6 +24,9 @@ function oli_acr_default_settings() {
 		// Loi 25 (Québec) et RGPD : rien n'est capté pour un visiteur sans son consentement explicite.
 		'guest_tracking'        => 'consent',
 		'consent_text'          => '',
+		// Textes de consentement par langue (locale => texte) et langue de repli (vide = langue par défaut du site).
+		'consent_texts'         => array(),
+		'fallback_language'     => '',
 		'roles_mode'            => 'all',
 		'roles'                 => array(),
 		'pending_enabled'       => 'no',
@@ -91,19 +94,49 @@ function oli_acr_default_consent_text() {
 }
 
 /**
- * Texte de consentement (réglage personnalisé, sinon texte par défaut traduit dans la langue courante).
+ * Texte de consentement personnalisé de la langue de repli (vide = texte par défaut).
  *
- * Un texte enregistré identique au texte par défaut d'une des langues installées est traité comme
- * le texte par défaut : il suit alors la langue du visiteur.
- *
+ * @param string|null $fallback Langue de repli.
  * @return string
  */
-function oli_acr_consent_text() {
-	$text = (string) oli_acr_get_setting( 'consent_text' );
-	if ( '' === trim( $text ) || oli_acr_is_default_consent_text( $text ) ) {
-		return oli_acr_default_consent_text();
+function oli_acr_consent_base_text( $fallback = null ) {
+	$fallback = null === $fallback ? OLI_ACR_Lang::fallback_language() : $fallback;
+	$texts    = (array) oli_acr_get_setting( 'consent_texts' );
+	$text     = isset( $texts[ $fallback ] ) ? (string) $texts[ $fallback ] : '';
+	if ( '' === trim( $text ) ) {
+		// Réglage de la 1.0.x (une seule langue).
+		$text = (string) oli_acr_get_setting( 'consent_text' );
 	}
-	return $text;
+	return ( '' === trim( $text ) || oli_acr_is_default_consent_text( $text ) ) ? '' : $text;
+}
+
+/**
+ * Texte de consentement dans une langue, dans cet ordre de priorité :
+ * texte saisi pour cette langue, traduction WPML / Polylang du texte de repli, texte par défaut
+ * traduit (si le texte de repli n'est pas personnalisé), puis texte de repli.
+ *
+ * @param string $locale Langue (vide = langue de la requête).
+ * @return string
+ */
+function oli_acr_consent_text( $locale = '' ) {
+	$locale   = '' !== $locale ? OLI_ACR_Lang::resolve( $locale ) : OLI_ACR_Lang::current_language();
+	$fallback = OLI_ACR_Lang::fallback_language();
+	$texts    = (array) oli_acr_get_setting( 'consent_texts' );
+	$own      = isset( $texts[ $locale ] ) ? trim( (string) $texts[ $locale ] ) : '';
+	if ( '' !== $own && ! oli_acr_is_default_consent_text( $own ) ) {
+		return $own;
+	}
+	$base = oli_acr_consent_base_text( $fallback );
+	if ( '' === $base ) {
+		return oli_acr_in_locale( $locale, 'oli_acr_default_consent_text' );
+	}
+	if ( $locale !== $fallback ) {
+		$translated = OLI_ACR_Lang::adapter()->translate_string( OLI_ACR_Lang::string_name( 'consent_text' ), $base, $locale );
+		if ( null !== $translated ) {
+			return $translated;
+		}
+	}
+	return $base;
 }
 
 /**
@@ -329,18 +362,21 @@ function oli_acr_email_signature( $email ) {
 }
 
 /**
- * URL de désabonnement signée.
+ * URL de désabonnement signée, dans la langue du destinataire.
  *
- * @param string $email Courriel.
+ * @param string $email  Courriel.
+ * @param string $locale Langue (vide = langue de repli).
  * @return string
  */
-function oli_acr_unsubscribe_url( $email ) {
+function oli_acr_unsubscribe_url( $email, $locale = '' ) {
+	$locale = OLI_ACR_Lang::resolve( $locale );
 	return add_query_arg(
 		array(
 			'oli_acr_unsub' => rawurlencode( $email ),
 			'oli_acr_sig'   => oli_acr_email_signature( $email ),
+			'oli_acr_lang'  => $locale,
 		),
-		home_url( '/' )
+		OLI_ACR_Lang::home_url( $locale )
 	);
 }
 
@@ -366,21 +402,12 @@ function oli_acr_user_is_tracked( $user_id ) {
 }
 
 /**
- * Langue courante du visiteur (compatible WPML / Polylang / TranslatePress).
+ * Langue courante du visiteur, en locale (WPML, Polylang, TranslatePress, Weglot ou cœur).
  *
  * @return string
  */
 function oli_acr_current_language() {
-	if ( defined( 'ICL_LANGUAGE_CODE' ) ) {
-		return (string) ICL_LANGUAGE_CODE;
-	}
-	if ( function_exists( 'pll_current_language' ) ) {
-		$lang = pll_current_language();
-		if ( $lang ) {
-			return (string) $lang;
-		}
-	}
-	return determine_locale();
+	return OLI_ACR_Lang::current_language();
 }
 
 /**

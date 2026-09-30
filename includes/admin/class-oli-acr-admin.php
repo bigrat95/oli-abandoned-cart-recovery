@@ -377,8 +377,8 @@ class OLI_ACR_Admin {
 			echo '<tr><td colspan="5">' . esc_html__( 'No data for this period.', 'oli-abandoned-cart-recovery' ) . '</td></tr>';
 		}
 		foreach ( (array) $by_tpl as $row ) {
-			$tpl = OLI_ACR_Templates::get( $row->template_id );
-			printf( '<tr><td>%s</td><td>%d</td><td>%d</td><td>%d</td><td>%s</td></tr>', esc_html( $tpl ? $tpl['name'] : $row->template_id ), (int) $row->sent, (int) $row->clicked, (int) $row->recovered, wp_kses_post( wc_price( (float) $row->amount ) ) );
+			$name = self::template_name( (string) $row->template_id );
+			printf( '<tr><td>%s</td><td>%d</td><td>%d</td><td>%d</td><td>%s</td></tr>', esc_html( $name ), (int) $row->sent, (int) $row->clicked, (int) $row->recovered, wp_kses_post( wc_price( (float) $row->amount ) ) );
 		}
 		echo '</tbody></table>';
 	}
@@ -446,7 +446,35 @@ class OLI_ACR_Admin {
 			printf( '<option value="%s"%s>%s</option>', esc_attr( $key ), selected( $s['guest_tracking'], $key, false ), esc_html( $label ) );
 		}
 		echo '</select></td></tr>';
-		echo '<tr><th>' . esc_html__( 'Consent text', 'oli-abandoned-cart-recovery' ) . '</th><td><textarea name="s[consent_text]" rows="2" class="large-text" placeholder="' . esc_attr( oli_acr_default_consent_text() ) . '">' . esc_textarea( oli_acr_is_default_consent_text( (string) $s['consent_text'] ) ? '' : (string) $s['consent_text'] ) . '</textarea><p class="description">' . esc_html__( 'Label of the checkbox shown under the email field (consent mode). Leave empty to use the default text, translated in each visitor\'s language.', 'oli-abandoned-cart-recovery' ) . '</p></td></tr>';
+		echo '<tr><th>' . esc_html__( 'Fallback language', 'oli-abandoned-cart-recovery' ) . '</th><td><select name="s[fallback_language]">';
+		printf( '<option value="">%s</option>', esc_html( sprintf( /* translators: %s: language name. */ __( 'Site default language (%s)', 'oli-abandoned-cart-recovery' ), OLI_ACR_Lang::label( OLI_ACR_Lang::adapter()->default_language() ) ) ) );
+		foreach ( OLI_ACR_Lang::adapter()->languages() as $locale ) {
+			printf( '<option value="%s"%s>%s</option>', esc_attr( $locale ), selected( (string) $s['fallback_language'], $locale, false ), esc_html( OLI_ACR_Lang::label( $locale ) ) );
+		}
+		echo '</select><p class="description">' . esc_html(
+			sprintf(
+				/* translators: %s: multilingual plugin name. */
+				__( 'Language used for a cart whose language is unknown or no longer active, and for texts that are missing in a language. Languages detected with: %s.', 'oli-abandoned-cart-recovery' ),
+				OLI_ACR_Lang::adapter()->label()
+			)
+		) . '</p></td></tr>';
+		echo '<tr><th>' . esc_html__( 'Consent text', 'oli-abandoned-cart-recovery' ) . '</th><td>';
+		$consent_texts = (array) $s['consent_texts'];
+		foreach ( OLI_ACR_Lang::languages() as $locale ) {
+			$value = isset( $consent_texts[ $locale ] ) ? (string) $consent_texts[ $locale ] : '';
+			if ( '' === $value && OLI_ACR_Lang::fallback_language() === $locale ) {
+				$value = oli_acr_consent_base_text( $locale );
+			}
+			printf(
+				'<p class="oli-acr-lang-field"><label for="oli-acr-consent-%1$s"><strong>%2$s</strong></label><br><textarea id="oli-acr-consent-%1$s" name="s[consent_texts][%1$s]" rows="2" class="large-text" lang="%3$s" placeholder="%4$s">%5$s</textarea></p>',
+				esc_attr( $locale ),
+				esc_html( OLI_ACR_Lang::label( $locale ) ),
+				esc_attr( str_replace( '_', '-', $locale ) ),
+				esc_attr( oli_acr_consent_text( $locale ) ),
+				esc_textarea( oli_acr_is_default_consent_text( $value ) ? '' : $value )
+			);
+		}
+		echo '<p class="description">' . esc_html__( 'Label of the checkbox shown under the email field (consent mode), for each language. Leave a language empty to use, in order: its WPML or Polylang string translation, the default text translated in that language, then the fallback language text.', 'oli-abandoned-cart-recovery' ) . '</p></td></tr>';
 		echo '<tr><th>' . esc_html__( 'Registered customers tracked', 'oli-abandoned-cart-recovery' ) . '</th><td>';
 		printf( '<label><input type="radio" name="s[roles_mode]" value="all"%s> %s</label><br>', checked( 'all', $s['roles_mode'], false ), esc_html__( 'All roles', 'oli-abandoned-cart-recovery' ) );
 		printf( '<label><input type="radio" name="s[roles_mode]" value="selected"%s> %s</label><br>', checked( 'selected', $s['roles_mode'], false ), esc_html__( 'Only these roles:', 'oli-abandoned-cart-recovery' ) );
@@ -532,11 +560,19 @@ class OLI_ACR_Admin {
 		$new['delete_carts_after']   = oli_acr_sanitize_duration( isset( $raw['delete_carts_after'] ) ? $raw['delete_carts_after'] : array() );
 		$new['retention_days']       = isset( $raw['retention_days'] ) ? absint( $raw['retention_days'] ) : 0;
 		$new['guest_tracking']       = isset( $raw['guest_tracking'] ) && in_array( $raw['guest_tracking'], array( 'always', 'consent', 'never' ), true ) ? $raw['guest_tracking'] : 'consent';
-		$new['consent_text']         = isset( $raw['consent_text'] ) ? sanitize_textarea_field( $raw['consent_text'] ) : '';
-		if ( oli_acr_is_default_consent_text( $new['consent_text'] ) ) {
+		$new['fallback_language']    = isset( $raw['fallback_language'] ) && in_array( $raw['fallback_language'], OLI_ACR_Lang::adapter()->languages(), true ) ? (string) $raw['fallback_language'] : '';
+		$new['consent_texts']        = array();
+		$submitted_consent           = isset( $raw['consent_texts'] ) && is_array( $raw['consent_texts'] ) ? $raw['consent_texts'] : array();
+		foreach ( OLI_ACR_Lang::languages() as $locale ) {
+			$text = isset( $submitted_consent[ $locale ] ) ? sanitize_textarea_field( $submitted_consent[ $locale ] ) : '';
 			// Texte par défaut : on n'enregistre rien pour qu'il reste traduit dans la langue du visiteur.
-			$new['consent_text'] = '';
+			if ( '' !== trim( $text ) && ! oli_acr_is_default_consent_text( $text ) ) {
+				$new['consent_texts'][ $locale ] = $text;
+			}
 		}
+		// Champ de la 1.0.x : miroir du texte de la langue de repli.
+		$fallback_new           = '' !== $new['fallback_language'] ? $new['fallback_language'] : OLI_ACR_Lang::adapter()->default_language();
+		$new['consent_text']    = isset( $new['consent_texts'][ $fallback_new ] ) ? $new['consent_texts'][ $fallback_new ] : '';
 		$new['roles_mode']      = isset( $raw['roles_mode'] ) && 'selected' === $raw['roles_mode'] ? 'selected' : 'all';
 		$new['roles']           = isset( $raw['roles'] ) ? array_values( array_intersect( array_map( 'sanitize_key', (array) $raw['roles'] ), array_keys( wp_roles()->get_names() ) ) ) : array();
 		$new['sender_name']     = isset( $raw['sender_name'] ) ? sanitize_text_field( $raw['sender_name'] ) : '';
@@ -562,6 +598,10 @@ class OLI_ACR_Admin {
 		update_option( 'oli_acr_blocklist', $list, false );
 
 		OLI_ACR_Install::sync_shop_manager_cap();
+		if ( $old['fallback_language'] !== $new['fallback_language'] ) {
+			OLI_ACR_Templates::sync_languages();
+		}
+		OLI_ACR_Lang::register_strings();
 		self::redirect( 'settings', 'saved' );
 	}
 
@@ -579,21 +619,48 @@ class OLI_ACR_Admin {
 		}
 
 		$templates = OLI_ACR_Templates::all();
-		echo '<p><a class="button button-primary" href="' . esc_url( self::url( 'templates', array( 'edit' => 'new' ) ) ) . '">' . esc_html__( 'Add template', 'oli-abandoned-cart-recovery' ) . '</a></p>';
+		$lang      = self::tab_language();
+		self::language_tabs( self::url( 'templates' ), $lang );
+		echo '<p><a class="button button-primary" href="' . esc_url(
+			self::url(
+				'templates',
+				array(
+					'edit' => 'new',
+					'lang' => $lang,
+				)
+			)
+		) . '">' . esc_html__( 'Add template', 'oli-abandoned-cart-recovery' ) . '</a></p>';
 		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Name', 'oli-abandoned-cart-recovery' ) . '</th><th>' . esc_html__( 'Type', 'oli-abandoned-cart-recovery' ) . '</th><th>' . esc_html__( 'Send after', 'oli-abandoned-cart-recovery' ) . '</th><th>' . esc_html__( 'Coupon', 'oli-abandoned-cart-recovery' ) . '</th><th>' . esc_html__( 'Status', 'oli-abandoned-cart-recovery' ) . '</th><th></th></tr></thead><tbody>';
 		$units = oli_acr_duration_units();
 		foreach ( $templates as $id => $tpl ) {
+			$tpl    = OLI_ACR_Templates::for_locale( (string) $id, $tpl, $lang );
 			$delete = wp_nonce_url( admin_url( 'admin-post.php?action=oli_acr_delete_template&template=' . $id ), 'oli_acr_delete_template' );
 			printf(
 				'<tr><td><strong><a href="%s">%s</a></strong><br><small>%s</small></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><a href="%s">%s</a> | <a class="submitdelete" href="%s" onclick="return confirm(\'%s\');">%s</a></td></tr>',
-				esc_url( self::url( 'templates', array( 'edit' => $id ) ) ),
+				esc_url(
+					self::url(
+						'templates',
+						array(
+							'edit' => $id,
+							'lang' => $lang,
+						)
+					)
+				),
 				esc_html( $tpl['name'] ),
 				esc_html( $tpl['subject'] ),
 				'order' === $tpl['type'] ? esc_html__( 'Pending order', 'oli-abandoned-cart-recovery' ) : esc_html__( 'Abandoned cart', 'oli-abandoned-cart-recovery' ),
 				esc_html( $tpl['delay']['value'] . ' ' . strtolower( $units[ $tpl['delay']['unit'] ] ) ),
 				'yes' === $tpl['coupon_enabled'] ? esc_html( wc_format_localized_decimal( $tpl['coupon_amount'] ) . ( 'percent' === $tpl['coupon_type'] ? ' %' : ' ' . get_woocommerce_currency_symbol() ) ) : '—',
 				'yes' === $tpl['active'] ? '<mark class="oli-acr-status oli-acr-status-recovered">' . esc_html__( 'Active', 'oli-abandoned-cart-recovery' ) . '</mark>' : '<mark class="oli-acr-status">' . esc_html__( 'Inactive', 'oli-abandoned-cart-recovery' ) . '</mark>',
-				esc_url( self::url( 'templates', array( 'edit' => $id ) ) ),
+				esc_url(
+					self::url(
+						'templates',
+						array(
+							'edit' => $id,
+							'lang' => $lang,
+						)
+					)
+				),
 				esc_html__( 'Edit', 'oli-abandoned-cart-recovery' ),
 				esc_url( $delete ),
 				esc_js( __( 'Delete this template?', 'oli-abandoned-cart-recovery' ) ),
@@ -602,24 +669,85 @@ class OLI_ACR_Admin {
 		}
 		echo '</tbody></table>';
 		echo '<p class="description">' . esc_html__( 'Cart templates are sent in sequence, from the shortest delay to the longest, counted from the moment the cart was abandoned. Pending order templates are counted from the pending order delay set in Settings.', 'oli-abandoned-cart-recovery' ) . '</p>';
-		self::render_test_form( '' );
+		self::render_test_form( '', $lang );
+	}
+
+	/**
+	 * Langue de l'onglet choisi (paramètre lang), sinon langue de l'admin.
+	 *
+	 * @return string
+	 */
+	public static function tab_language() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Lecture seule d'un onglet.
+		$lang = isset( $_GET['lang'] ) ? OLI_ACR_Lang::normalize( sanitize_text_field( wp_unslash( $_GET['lang'] ) ) ) : '';
+		return '' !== $lang ? $lang : OLI_ACR_Lang::admin_language();
+	}
+
+	/**
+	 * Onglets de langue.
+	 *
+	 * @param string $base    URL de base.
+	 * @param string $current Langue affichée.
+	 * @return void
+	 */
+	private static function language_tabs( $base, $current ) {
+		$languages = OLI_ACR_Lang::languages();
+		if ( count( $languages ) < 2 ) {
+			return;
+		}
+		echo '<h2 class="nav-tab-wrapper oli-acr-lang-tabs">';
+		foreach ( $languages as $locale ) {
+			$label = OLI_ACR_Lang::label( $locale );
+			if ( OLI_ACR_Lang::fallback_language() === $locale ) {
+				/* translators: %s: language name. */
+				$label = sprintf( __( '%s — fallback', 'oli-abandoned-cart-recovery' ), $label );
+			}
+			printf( '<a href="%s" class="nav-tab%s" data-lang="%s">%s</a>', esc_url( add_query_arg( 'lang', $locale, $base ) ), $locale === $current ? ' nav-tab-active' : '', esc_attr( $locale ), esc_html( $label ) );
+		}
+		echo '</h2>';
+	}
+
+	/**
+	 * Nom d'un modèle dans la langue de l'admin (journal, tableau de bord).
+	 *
+	 * @param string $id ID du modèle.
+	 * @return string
+	 */
+	public static function template_name( $id ) {
+		$tpl = OLI_ACR_Templates::get( $id );
+		if ( ! $tpl ) {
+			return $id;
+		}
+		$tpl = OLI_ACR_Templates::for_locale( $id, $tpl, OLI_ACR_Lang::admin_language() );
+		return (string) $tpl['name'];
 	}
 
 	/**
 	 * Formulaire « Envoyer un test ».
 	 *
 	 * @param string $template_id Modèle présélectionné.
+	 * @param string $lang        Langue présélectionnée.
 	 * @return void
 	 */
-	private static function render_test_form( $template_id ) {
+	private static function render_test_form( $template_id, $lang = '' ) {
+		$lang = '' !== $lang ? $lang : OLI_ACR_Lang::admin_language();
 		echo '<h2>' . esc_html__( 'Send a test', 'oli-abandoned-cart-recovery' ) . '</h2>';
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="oli-acr-test">';
 		wp_nonce_field( 'oli_acr_test_email' );
 		echo '<input type="hidden" name="action" value="oli_acr_test_email"><select name="template">';
 		foreach ( OLI_ACR_Templates::all() as $id => $tpl ) {
+			$tpl = OLI_ACR_Templates::for_locale( (string) $id, $tpl, $lang );
 			printf( '<option value="%s"%s>%s</option>', esc_attr( $id ), selected( $template_id, $id, false ), esc_html( $tpl['name'] ) );
 		}
-		echo '</select> <input type="email" name="to" required class="regular-text" value="' . esc_attr( wp_get_current_user()->user_email ) . '"> ';
+		echo '</select> ';
+		if ( count( OLI_ACR_Lang::languages() ) > 1 ) {
+			echo '<select name="lang" aria-label="' . esc_attr__( 'Language', 'oli-abandoned-cart-recovery' ) . '">';
+			foreach ( OLI_ACR_Lang::languages() as $locale ) {
+				printf( '<option value="%s"%s>%s</option>', esc_attr( $locale ), selected( $lang, $locale, false ), esc_html( OLI_ACR_Lang::label( $locale ) ) );
+			}
+			echo '</select> ';
+		}
+		echo '<input type="email" name="to" required class="regular-text" value="' . esc_attr( wp_get_current_user()->user_email ) . '"> ';
 		submit_button( __( 'Send a test', 'oli-abandoned-cart-recovery' ), 'secondary', 'submit', false );
 		echo '</form>';
 	}
@@ -631,28 +759,45 @@ class OLI_ACR_Admin {
 	 * @return void
 	 */
 	private static function render_template_form( $tpl ) {
-		$tpl = $tpl ? $tpl : OLI_ACR_Templates::blank();
-		echo '<p><a href="' . esc_url( self::url( 'templates' ) ) . '">&larr; ' . esc_html__( 'Back to templates', 'oli-abandoned-cart-recovery' ) . '</a></p>';
+		$tpl      = $tpl ? $tpl : OLI_ACR_Templates::blank();
+		$lang     = self::tab_language();
+		$own      = isset( $tpl['texts'][ $lang ] ) && is_array( $tpl['texts'][ $lang ] ) ? $tpl['texts'][ $lang ] : array();
+		$resolved = $tpl['id'] ? OLI_ACR_Templates::for_locale( (string) $tpl['id'], $tpl, $lang ) : $tpl;
+		$value    = static function ( $field ) use ( $own, $resolved ) {
+			return isset( $own[ $field ] ) && '' !== (string) $own[ $field ] ? (string) $own[ $field ] : (string) $resolved[ $field ];
+		};
+		echo '<p><a href="' . esc_url( self::url( 'templates', array( 'lang' => $lang ) ) ) . '">&larr; ' . esc_html__( 'Back to templates', 'oli-abandoned-cart-recovery' ) . '</a></p>';
+		self::language_tabs( self::url( 'templates', array( 'edit' => $tpl['id'] ? $tpl['id'] : 'new' ) ), $lang );
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 		wp_nonce_field( 'oli_acr_save_template' );
-		echo '<input type="hidden" name="action" value="oli_acr_save_template"><input type="hidden" name="t[id]" value="' . esc_attr( $tpl['id'] ) . '">';
-		echo '<table class="form-table" role="presentation">';
-		printf( '<tr><th>%s</th><td><input type="text" required class="regular-text" name="t[name]" value="%s"></td></tr>', esc_html__( 'Template name', 'oli-abandoned-cart-recovery' ), esc_attr( $tpl['name'] ) );
-		echo '<tr><th>' . esc_html__( 'Active', 'oli-abandoned-cart-recovery' ) . '</th><td><label><input type="checkbox" name="t[active]" value="1"' . checked( 'yes', $tpl['active'], false ) . '> ' . esc_html__( 'Send this template automatically', 'oli-abandoned-cart-recovery' ) . '</label></td></tr>';
-		echo '<tr><th>' . esc_html__( 'Type', 'oli-abandoned-cart-recovery' ) . '</th><td><select name="t[type]"><option value="cart"' . selected( 'cart', $tpl['type'], false ) . '>' . esc_html__( 'Abandoned cart', 'oli-abandoned-cart-recovery' ) . '</option><option value="order"' . selected( 'order', $tpl['type'], false ) . '>' . esc_html__( 'Pending order', 'oli-abandoned-cart-recovery' ) . '</option></select></td></tr>';
-		echo '<tr><th>' . esc_html__( 'Send after', 'oli-abandoned-cart-recovery' ) . '</th><td>';
-		self::duration_field( 't[delay]', $tpl['delay'] );
-		echo '</td></tr>';
-		printf( '<tr><th>%s</th><td><input type="text" required class="large-text" name="t[subject]" value="%s"></td></tr>', esc_html__( 'Email subject', 'oli-abandoned-cart-recovery' ), esc_attr( $tpl['subject'] ) );
-		printf( '<tr><th>%s</th><td><input type="text" class="large-text" name="t[heading]" value="%s"></td></tr>', esc_html__( 'Email heading', 'oli-abandoned-cart-recovery' ), esc_attr( $tpl['heading'] ) );
-		printf( '<tr><th>%s</th><td><input type="email" class="regular-text" name="t[reply_to]" value="%s" placeholder="%s"></td></tr>', esc_html__( 'Reply-to address', 'oli-abandoned-cart-recovery' ), esc_attr( $tpl['reply_to'] ), esc_attr( oli_acr_get_setting( 'reply_to' ) ) );
-		printf( '<tr><th>%s</th><td><input type="text" class="regular-text" name="t[button_label]" value="%s"></td></tr>', esc_html__( 'Recovery button label', 'oli-abandoned-cart-recovery' ), esc_attr( $tpl['button_label'] ) );
+		echo '<input type="hidden" name="action" value="oli_acr_save_template"><input type="hidden" name="t[id]" value="' . esc_attr( $tpl['id'] ) . '"><input type="hidden" name="t[lang]" value="' . esc_attr( $lang ) . '">';
+		$field = 't[texts][' . $lang . ']';
+		if ( $tpl['id'] && array() === array_filter( array_map( 'strval', $own ) ) ) {
+			echo '<div class="notice notice-info inline"><p>' . esc_html(
+				sprintf(
+					/* translators: %s: language name. */
+					__( 'No text saved yet for %s. The fields show what is sent in this language now (string translation, translated default text or fallback language). Save to keep your own version.', 'oli-abandoned-cart-recovery' ),
+					OLI_ACR_Lang::label( $lang )
+				)
+			) . '</p></div>';
+		}
+		echo '<h2>' . esc_html(
+			sprintf(
+				/* translators: %s: language name. */
+				__( 'Texts — %s', 'oli-abandoned-cart-recovery' ),
+				OLI_ACR_Lang::label( $lang )
+			)
+		) . '</h2><table class="form-table oli-acr-lang-panel" role="presentation" lang="' . esc_attr( str_replace( '_', '-', $lang ) ) . '">';
+		printf( '<tr><th>%s</th><td><input type="text" required class="regular-text" name="%s[name]" value="%s"></td></tr>', esc_html__( 'Template name', 'oli-abandoned-cart-recovery' ), esc_attr( $field ), esc_attr( $value( 'name' ) ) );
+		printf( '<tr><th>%s</th><td><input type="text" required class="large-text" name="%s[subject]" value="%s"></td></tr>', esc_html__( 'Email subject', 'oli-abandoned-cart-recovery' ), esc_attr( $field ), esc_attr( $value( 'subject' ) ) );
+		printf( '<tr><th>%s</th><td><input type="text" class="large-text" name="%s[heading]" value="%s"></td></tr>', esc_html__( 'Email heading', 'oli-abandoned-cart-recovery' ), esc_attr( $field ), esc_attr( $value( 'heading' ) ) );
+		printf( '<tr><th>%s</th><td><input type="text" class="regular-text" name="%s[button_label]" value="%s"></td></tr>', esc_html__( 'Recovery button label', 'oli-abandoned-cart-recovery' ), esc_attr( $field ), esc_attr( $value( 'button_label' ) ) );
 		echo '<tr><th>' . esc_html__( 'Email content', 'oli-abandoned-cart-recovery' ) . '</th><td>';
 		wp_editor(
-			$tpl['content'],
+			$value( 'content' ),
 			'oli_acr_content',
 			array(
-				'textarea_name' => 't[content]',
+				'textarea_name' => $field . '[content]',
 				'textarea_rows' => 14,
 				'media_buttons' => false,
 			)
@@ -661,7 +806,15 @@ class OLI_ACR_Admin {
 		foreach ( OLI_ACR_Mailer::placeholders() as $tag => $label ) {
 			printf( '<li><code>%s</code> %s</li>', esc_html( $tag ), esc_html( $label ) );
 		}
-		echo '</ul></td></tr>';
+		echo '</ul></td></tr></table>';
+
+		echo '<h2>' . esc_html__( 'Settings (all languages)', 'oli-abandoned-cart-recovery' ) . '</h2><table class="form-table" role="presentation">';
+		echo '<tr><th>' . esc_html__( 'Active', 'oli-abandoned-cart-recovery' ) . '</th><td><label><input type="checkbox" name="t[active]" value="1"' . checked( 'yes', $tpl['active'], false ) . '> ' . esc_html__( 'Send this template automatically', 'oli-abandoned-cart-recovery' ) . '</label></td></tr>';
+		echo '<tr><th>' . esc_html__( 'Type', 'oli-abandoned-cart-recovery' ) . '</th><td><select name="t[type]"><option value="cart"' . selected( 'cart', $tpl['type'], false ) . '>' . esc_html__( 'Abandoned cart', 'oli-abandoned-cart-recovery' ) . '</option><option value="order"' . selected( 'order', $tpl['type'], false ) . '>' . esc_html__( 'Pending order', 'oli-abandoned-cart-recovery' ) . '</option></select></td></tr>';
+		echo '<tr><th>' . esc_html__( 'Send after', 'oli-abandoned-cart-recovery' ) . '</th><td>';
+		self::duration_field( 't[delay]', $tpl['delay'] );
+		echo '</td></tr>';
+		printf( '<tr><th>%s</th><td><input type="email" class="regular-text" name="t[reply_to]" value="%s" placeholder="%s"></td></tr>', esc_html__( 'Reply-to address', 'oli-abandoned-cart-recovery' ), esc_attr( $tpl['reply_to'] ), esc_attr( oli_acr_get_setting( 'reply_to' ) ) );
 		echo '<tr><th>' . esc_html__( 'Coupon', 'oli-abandoned-cart-recovery' ) . '</th><td><label><input type="checkbox" name="t[coupon_enabled]" value="1"' . checked( 'yes', $tpl['coupon_enabled'], false ) . '> ' . esc_html__( 'Create a unique single-use coupon for each email ({coupon})', 'oli-abandoned-cart-recovery' ) . '</label><br>';
 		printf( '<input type="number" step="0.01" min="0" class="small-text" name="t[coupon_amount]" value="%s"> ', esc_attr( $tpl['coupon_amount'] ) );
 		echo '<select name="t[coupon_type]"><option value="percent"' . selected( 'percent', $tpl['coupon_type'], false ) . '>' . esc_html__( 'Percentage discount', 'oli-abandoned-cart-recovery' ) . '</option><option value="fixed_cart"' . selected( 'fixed_cart', $tpl['coupon_type'], false ) . '>' . esc_html__( 'Fixed cart discount', 'oli-abandoned-cart-recovery' ) . '</option></select> ';
@@ -670,7 +823,7 @@ class OLI_ACR_Admin {
 		submit_button( __( 'Save template', 'oli-abandoned-cart-recovery' ) );
 		echo '</form>';
 		if ( $tpl['id'] ) {
-			self::render_test_form( $tpl['id'] );
+			self::render_test_form( $tpl['id'], $lang );
 		}
 	}
 
@@ -682,9 +835,37 @@ class OLI_ACR_Admin {
 	public static function save_template() {
 		self::check_cap();
 		check_admin_referer( 'oli_acr_save_template' );
-		$raw = isset( $_POST['t'] ) && is_array( $_POST['t'] ) ? wp_unslash( $_POST['t'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Nettoyé par OLI_ACR_Templates::sanitize().
-		$id  = OLI_ACR_Templates::save( OLI_ACR_Templates::sanitize( $raw ) );
-		self::redirect( 'templates', 'tpl_saved', array( 'edit' => $id ) );
+		$raw      = isset( $_POST['t'] ) && is_array( $_POST['t'] ) ? wp_unslash( $_POST['t'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Nettoyé par OLI_ACR_Templates::sanitize().
+		$existing = ! empty( $raw['id'] ) ? OLI_ACR_Templates::get( sanitize_key( $raw['id'] ) ) : null;
+		$lang     = isset( $raw['lang'] ) ? OLI_ACR_Lang::normalize( sanitize_text_field( $raw['lang'] ) ) : '';
+		$lang     = '' !== $lang ? $lang : OLI_ACR_Lang::fallback_language();
+		$tpl      = OLI_ACR_Templates::sanitize( $raw, $existing );
+		if ( $existing && ( ! isset( $existing['texts'][ $lang ] ) || array() === array_filter( array_map( 'strval', (array) $existing['texts'][ $lang ] ) ) ) && isset( $tpl['texts'][ $lang ] ) ) {
+			// Langue sans texte propre : les champs affichaient le texte envoyé actuellement ; s'ils n'ont pas
+			// été modifiés, on ne les fige pas (la langue continue de suivre traductions et repli).
+			$resolved = OLI_ACR_Templates::for_locale( (string) $existing['id'], $existing, $lang );
+			$same     = true;
+			foreach ( OLI_ACR_Templates::TEXT_FIELDS as $field ) {
+				if ( oli_acr_normalize_text( wpautop( (string) $tpl['texts'][ $lang ][ $field ] ) ) !== oli_acr_normalize_text( wpautop( (string) $resolved[ $field ] ) ) ) {
+					$same = false;
+					break;
+				}
+			}
+			if ( $same ) {
+				unset( $tpl['texts'][ $lang ] );
+				$tpl = OLI_ACR_Templates::mirror_fallback( $tpl );
+			}
+		}
+		$id = OLI_ACR_Templates::save( $tpl );
+		OLI_ACR_Lang::register_strings();
+		self::redirect(
+			'templates',
+			'tpl_saved',
+			array(
+				'edit' => $id,
+				'lang' => $lang,
+			)
+		);
 	}
 
 	/**
@@ -708,11 +889,20 @@ class OLI_ACR_Admin {
 	public static function test_email() {
 		self::check_cap();
 		check_admin_referer( 'oli_acr_test_email' );
-		$to  = isset( $_POST['to'] ) ? sanitize_email( wp_unslash( $_POST['to'] ) ) : '';
-		$id  = isset( $_POST['template'] ) ? sanitize_key( $_POST['template'] ) : '';
-		$tpl = OLI_ACR_Templates::get( $id );
-		$ok  = $tpl && is_email( $to ) && OLI_ACR_Mailer::send_test( $to, $tpl );
-		self::redirect( 'templates', $ok ? 'test_sent' : 'test_failed', array( 'edit' => $id ) );
+		$to   = isset( $_POST['to'] ) ? sanitize_email( wp_unslash( $_POST['to'] ) ) : '';
+		$id   = isset( $_POST['template'] ) ? sanitize_key( $_POST['template'] ) : '';
+		$lang = isset( $_POST['lang'] ) ? OLI_ACR_Lang::normalize( sanitize_text_field( wp_unslash( $_POST['lang'] ) ) ) : '';
+		$lang = '' !== $lang ? $lang : OLI_ACR_Lang::admin_language();
+		$tpl  = OLI_ACR_Templates::get( $id );
+		$ok   = $tpl && is_email( $to ) && OLI_ACR_Mailer::send_test( $to, $tpl, $lang );
+		self::redirect(
+			'templates',
+			$ok ? 'test_sent' : 'test_failed',
+			array(
+				'edit' => $id,
+				'lang' => $lang,
+			)
+		);
 	}
 
 	/**

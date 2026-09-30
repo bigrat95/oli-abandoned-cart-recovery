@@ -211,7 +211,7 @@ class OLI_ACR_Carts {
 			'item_count'    => $snap['count'],
 			'cart_total'    => $snap['total'],
 			'currency'      => get_woocommerce_currency(),
-			'language'      => substr( oli_acr_current_language(), 0, 20 ),
+			'language'      => substr( self::language_for( $contact, $existing ), 0, 20 ),
 			'updated_at'    => $now,
 		);
 		foreach ( array( 'phone', 'first_name', 'last_name' ) as $field ) {
@@ -252,6 +252,25 @@ class OLI_ACR_Carts {
 		do_action( 'oli_acr_cart_captured', $id, $contact );
 
 		return $id;
+	}
+
+	/**
+	 * Langue à enregistrer : celle transmise par la page, sinon celle de la page courante (hors appels AJAX),
+	 * sinon celle déjà enregistrée, sinon la langue courante.
+	 *
+	 * @param array<mixed> $contact  Données de contact.
+	 * @param object|null  $existing Panier existant.
+	 * @return string
+	 */
+	private static function language_for( $contact, $existing ) {
+		if ( ! empty( $contact['language'] ) ) {
+			return (string) $contact['language'];
+		}
+		$ajax = wp_doing_ajax() || ( function_exists( 'wp_is_serving_rest_request' ) && wp_is_serving_rest_request() ) || isset( $_GET['wc-ajax'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Lecture seule.
+		if ( ! $ajax || ! $existing || '' === (string) $existing->language ) {
+			return OLI_ACR_Lang::current_language();
+		}
+		return (string) $existing->language;
 	}
 
 	/**
