@@ -2,13 +2,13 @@
 Contributors: bigrat95
 Tags: abandoned cart, woocommerce, cart recovery, pending orders, coupons
 Requires at least: 6.4
-Tested up to: 6.9
+Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.0
-License: GPL-2.0-or-later
+Stable tag: 1.0.1
+License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Recover abandoned WooCommerce carts and unpaid orders with a sequence of reminder emails, unique coupons and clear reports. Classic and block checkout.
+Recover abandoned WooCommerce carts and unpaid orders with reminder emails, unique coupons and reports. Classic and block checkout.
 
 == Description ==
 
@@ -22,12 +22,13 @@ It works with the **classic checkout** and the **block checkout**, is compatible
 * **Classic and block checkout** — one delegated listener works with both, through the lightweight `wc-ajax` endpoint
 * **Phone, first and last name** captured with the email
 * **Guests and registered customers** — logged-in carts are updated every time the cart changes
-* **Consent mode** — optional checkbox under the email field, with your own text (classic and block checkout)
+* **Consent first (default)** — for guests, nothing is saved (no email, phone or cart) until they tick the consent checkbox under the email field (classic and block checkout). The default text follows each visitor's language; you can replace it with your own
 * **Tracked roles** — all users or only the roles you choose
 * **Cart snapshot** — products, quantities, variations, total, currency and language, linked to the WooCommerce session and a secure token
 
 = Reminders =
 
+* **Sent in the customer's language** — each reminder is sent in the language saved with the cart (`switch_to_locale`). Default templates stay translatable until you edit them
 * **Several email templates**, each with its own delay, subject, heading, reply-to address, content, recovery button label and active/inactive status
 * **Sent in sequence** — reminder #1, then #2, and so on, counted from the moment the cart was abandoned
 * **Placeholders** — `{first_name}`, `{last_name}`, `{full_name}`, `{email}`, `{cart_items}`, `{cart_total}`, `{recovery_link}`, `{recovery_button}`, `{coupon}`, `{coupon_code}`, `{unsubscribe_link}`, `{site_name}`, `{site_url}`, `{order_number}`, `{order_date}`
@@ -42,7 +43,7 @@ It works with the **classic checkout** and the **block checkout**, is compatible
 = Stop, unsubscribe and privacy =
 
 * **Automatic stop** — as soon as an order is placed with the same session or email, the cart is marked *Recovered* and linked to the order
-* **Unsubscribe link** in every email (with `List-Unsubscribe` and one-click support) and an **exclusion list** you can edit
+* **Unsubscribe link** in every email (with `List-Unsubscribe` and `List-Unsubscribe-Post` one-click headers, RFC 8058) and an **exclusion list** you can edit
 * **No email ever sent** to unsubscribed addresses
 * **Personal data exporter and eraser** for the WordPress privacy tools
 * **Suggested privacy policy text**
@@ -61,33 +62,6 @@ It works with the **classic checkout** and the **block checkout**, is compatible
 * One indexed `UPDATE` marks carts as abandoned; reminders are processed in batches (`oli_acr_batch_size` filter)
 * No work on the front end besides the checkout script (about 2 KB, no jQuery)
 * No external service, no tracking pixel
-
-= Feature mapping (YITH Recover Abandoned Cart 3.8.0 → Oli) =
-
-This plugin was written from scratch to cover the same needs as the YITH plugin used on client sites. No code, name or text was reused.
-
-* Abandoned cart post type → custom indexed table `{prefix}oli_acr_carts`
-* Guest email grab (AJAX on checkout) → `wc-ajax=oli_acr_capture`, classic **and block** checkout
-* Guest phone grab → phone captured with the email
-* "Recover guest carts: never / always / with terms" → Guest carts: never / always / with consent box, editable text
-* User roles selection → Registered customers tracked: all roles / selected roles
-* Cut-off time → "Consider a cart abandoned after"
-* Cron interval → "Run the recovery task every" (Action Scheduler, WP-Cron fallback)
-* Email templates (post type) with delay, subject, content, auto send → Email templates with delay, subject, heading, reply-to, content, button label, active status
-* Placeholders `{{ywrac.*}}` → `{first_name}`, `{cart_items}`, `{recovery_button}`, `{coupon}`, `{unsubscribe_link}`…
-* Coupon per template (amount, type, validity, prefix) → same, plus email restriction and automatic apply on click
-* Delete coupons after use / when expired → same (moved to trash daily)
-* Pending order recovery → same, with its own start delay
-* Delete pending orders after (hold stock) → Cancel reminded pending orders after
-* Delete abandoned carts after → Delete unrecovered carts after + global data retention
-* Recover link (encrypted URL) → random 32-character token + log ID
-* Unsubscribe page and blacklist → signed unsubscribe link, confirmation page, one-click, exclusion list
-* Admin email on recovered cart → WooCommerce email "Recovered cart (admin)"
-* Test email → "Send a test" button
-* Carts, pending orders, recovered, email log, reports tabs → same tabs
-* Shop manager option → same, with the `oli_acr_manage` capability
-* Privacy exporter/eraser and policy text → same
-* HPOS and block checkout compatibility → declared and tested
 
 == Installation ==
 
@@ -123,9 +97,17 @@ Yes. Orders are only accessed through the WooCommerce CRUD API and compatibility
 
 No. The capture request only runs on the checkout page. Detection and sending run in the background with Action Scheduler, in batches, on indexed queries.
 
+= Are guests tracked without consent? =
+
+No, not by default. The default guest mode is **Only when the guest checks the consent box**: until the box is ticked, nothing is sent to the server or saved (no email, phone or cart). This follows Quebec's Law 25 and the GDPR, which require express consent before collecting personal information for marketing reminders. You can switch to *Always* (not recommended where consent is required) or *Never* in Settings. Existing 1.0.0 installations keep the mode that was saved.
+
+= In which language are reminders sent? =
+
+In the language saved with the cart (site language, or WPML / Polylang language). Default templates and the default consent text are translated in that language as long as you did not edit them. An edited template is sent as written, in a single language.
+
 = How do I remove all data? =
 
-Deleting the plugin from the Plugins screen removes its tables, options, scheduled actions, capability and order metadata. Generated coupons stay in WooCommerce because they may still be in use.
+Deleting the plugin from the Plugins screen removes its tables (carts and email log), options, capability, scheduled actions with their Action Scheduler logs and group, WP-Cron events, the plugin's WooCommerce log files, order, user and coupon metadata (including the block checkout consent field), the plugin's keys in WooCommerce sessions, and generated coupons that were never used. Generated coupons that were used stay in WooCommerce, because they are linked to orders; only the plugin's marker is removed. To keep everything, tick **Keep the data when the plugin is deleted** in Settings (off by default).
 
 = Which languages are supported? =
 
@@ -145,6 +127,19 @@ The plugin stores, in the store's own database: the email, phone, first and last
 
 == Changelog ==
 
+= 1.0.1 =
+* Privacy: guests are now captured only with explicit consent by default (Quebec Law 25, GDPR); without consent, no email, phone or cart is sent or saved
+* Fix: "Send next reminder now" refuses recovered, unsubscribed or finished carts; nonces are tied to each cart and order, and the sequence continues after a manual send
+* Fix: uninstall removes Action Scheduler logs and group, the plugin's WooCommerce log files, consent metadata, session keys and unused generated coupons
+* New: "Keep the data when the plugin is deleted" option (off by default)
+* Fix: reminders are sent in the language saved with the cart; default templates and the default consent text follow that language until edited
+* Fix: the default consent text is no longer frozen in one language when settings are saved
+* Fix: one-click unsubscribe header (List-Unsubscribe-Post)
+* Fix: the empty image column is removed from the email items table, and the coupon border uses the WooCommerce email base color
+* Fix: email addresses no longer break mid-address in the admin Customer column
+* Fix: test emails contain a dummy unsubscribe link with no effect
+* Code quality: WordPress Coding Standards (Extra, Docs), PHPCompatibility 7.4+, PHPStan level 6 and Plugin Check
+
 = 1.0.0 =
 * Initial release
 * Email and phone capture on the classic and block checkout, guests and registered customers
@@ -160,6 +155,9 @@ The plugin stores, in the store's own database: the email, phone, first and last
 * French (Canada) and French (France) translations
 
 == Upgrade Notice ==
+
+= 1.0.1 =
+New installs capture guests only with consent (Law 25). Several fixes: manual send, uninstall clean-up, reminder language, one-click unsubscribe.
 
 = 1.0.0 =
 Initial release.
