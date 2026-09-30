@@ -1,0 +1,34 @@
+# PHPStan : analyse statique d'Oli Abandoned Cart Recovery (outil de développement, hors du zip).
+includes:
+	- vendor/szepeviktor/phpstan-wordpress/extension.neon
+parameters:
+	level: 6
+	phpVersion: 70400
+	paths:
+		- oli-abandoned-cart-recovery.php
+		- uninstall.php
+		- includes/
+		- templates/
+	scanFiles:
+		- vendor/php-stubs/woocommerce-stubs/woocommerce-stubs.php
+	bootstrapFiles:
+		- tools/phpstan-bootstrap.php
+	# Les types PHPDoc de WordPress et WooCommerce ne sont pas garantis à l'exécution
+	# (ex. WC()->session peut être null) : les vérifications défensives restent.
+	treatPhpDocTypesAsCertain: false
+	ignoreErrors:
+		# Les stubs WooCommerce déclarent array|string, mais WC_Data::update_meta_data() accepte toute valeur
+		# (sérialisée par WordPress). Les entiers stockés ici (horodatages, ID) sont voulus.
+		-
+			identifier: argument.type
+			message: '#^Parameter \#2 \$value of method WC_Data::update_meta_data\(\) expects array\|string, int(<1, max>)? given\.$#'
+		# WC()->session est typé WC_Session (classe abstraite) ; l'objet réel est WC_Session_Handler.
+		-
+			identifier: method.notFound
+			message: '#^Call to an undefined method WC_Session::(has_session|set_customer_session_cookie)\(\)\.$#'
+			path: includes/class-oli-acr-recovery.php
+		# Les courriels de WC()->mailer()->get_emails() sont des sous-classes de WC_Email qui définissent trigger().
+		-
+			identifier: method.notFound
+			message: '#^Call to an undefined method WC_Email::trigger\(\)\.$#'
+			path: includes/class-oli-acr-recovery.php
