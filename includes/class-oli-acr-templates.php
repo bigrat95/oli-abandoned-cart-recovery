@@ -3,6 +3,8 @@
  * Modèles de courriels de relance (plusieurs, en séquence).
  *
  * @package OliAbandonedCartRecovery
+ * @author  Olivier Bigras (bigrat95)
+ * @link    https://olivierbigras.com
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -15,7 +17,7 @@ class OLI_ACR_Templates {
 	/**
 	 * Tous les modèles.
 	 *
-	 * @return array
+	 * @return array<mixed>
 	 */
 	public static function all() {
 		$templates = get_option( 'oli_acr_templates', array() );
@@ -32,7 +34,7 @@ class OLI_ACR_Templates {
 	 * Un modèle.
 	 *
 	 * @param string $id ID.
-	 * @return array|null
+	 * @return array<mixed>|null
 	 */
 	public static function get( $id ) {
 		$all = self::all();
@@ -43,7 +45,7 @@ class OLI_ACR_Templates {
 	 * Modèles actifs d'un type, triés par délai croissant.
 	 *
 	 * @param string $type cart ou order.
-	 * @return array
+	 * @return array<mixed>
 	 */
 	public static function active( $type = 'cart' ) {
 		$list = array();
@@ -64,7 +66,7 @@ class OLI_ACR_Templates {
 	/**
 	 * Modèle vide.
 	 *
-	 * @return array
+	 * @return array<mixed>
 	 */
 	public static function blank() {
 		return array(
@@ -91,7 +93,7 @@ class OLI_ACR_Templates {
 	/**
 	 * Enregistre un modèle (création si ID vide).
 	 *
-	 * @param array $tpl Modèle nettoyé.
+	 * @param array<mixed> $tpl Modèle nettoyé.
 	 * @return string ID.
 	 */
 	public static function save( $tpl ) {
@@ -109,6 +111,7 @@ class OLI_ACR_Templates {
 	 * Supprime un modèle.
 	 *
 	 * @param string $id ID.
+	 * @return void
 	 */
 	public static function delete( $id ) {
 		$all = self::all();
@@ -119,19 +122,21 @@ class OLI_ACR_Templates {
 
 	/**
 	 * Après un changement de modèles, les paniers en attente sont réévalués au prochain passage.
+	 *
+	 * @return void
 	 */
 	public static function reset_schedule() {
 		global $wpdb;
 		$table = oli_acr_table( 'carts' );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table() ou $wpdb->prefix avec un suffixe fixe, jamais une saisie.
 		$wpdb->query( "UPDATE {$table} SET next_send_at = abandoned_at WHERE status IN ('abandoned','reminded') AND abandoned_at IS NOT NULL" );
 	}
 
 	/**
 	 * Nettoie un modèle soumis par formulaire.
 	 *
-	 * @param array $raw Données brutes (déjà wp_unslash).
-	 * @return array
+	 * @param array<mixed> $raw Données brutes (déjà wp_unslash).
+	 * @return array<mixed>
 	 */
 	public static function sanitize( $raw ) {
 		$tpl                    = self::blank();
@@ -153,9 +158,75 @@ class OLI_ACR_Templates {
 	}
 
 	/**
+	 * Champs de texte d'un modèle qui suivent la langue du destinataire tant qu'ils ne sont pas modifiés.
+	 */
+	const TEXT_FIELDS = array( 'subject', 'heading', 'content', 'button_label' );
+
+	/**
+	 * Rend un modèle dans la langue courante.
+	 *
+	 * Si les textes du modèle sont encore ceux par défaut (dans n'importe quelle langue installée),
+	 * ils sont remplacés par les textes par défaut traduits dans la langue courante (celle du panier
+	 * pendant un envoi). Un modèle modifié par l'admin est envoyé tel quel.
+	 *
+	 * @param string               $id  ID du modèle.
+	 * @param array<string, mixed> $tpl Modèle.
+	 * @return array<string, mixed>
+	 */
+	public static function localize( $id, $tpl ) {
+		if ( ! self::has_default_text( $id, $tpl ) ) {
+			return $tpl;
+		}
+		$defaults = self::default_templates();
+		foreach ( self::TEXT_FIELDS as $field ) {
+			$tpl[ $field ] = $defaults[ $id ][ $field ];
+		}
+		return $tpl;
+	}
+
+	/**
+	 * Indique si les textes d'un modèle sont identiques aux textes par défaut d'une langue installée.
+	 *
+	 * @param string               $id  ID du modèle.
+	 * @param array<string, mixed> $tpl Modèle.
+	 * @return bool
+	 */
+	public static function has_default_text( $id, $tpl ) {
+		static $cache = null;
+		if ( null === $cache ) {
+			$cache = array();
+			foreach ( oli_acr_known_locales() as $locale ) {
+				$cache[ $locale ] = oli_acr_in_locale( $locale, array( __CLASS__, 'default_templates' ) );
+			}
+		}
+		foreach ( $cache as $defaults ) {
+			if ( ! isset( $defaults[ $id ] ) ) {
+				continue;
+			}
+			$same = true;
+			foreach ( self::TEXT_FIELDS as $field ) {
+				$a = isset( $tpl[ $field ] ) ? (string) $tpl[ $field ] : '';
+				$b = (string) $defaults[ $id ][ $field ];
+				if ( 'content' === $field ) {
+					$a = wpautop( $a );
+					$b = wpautop( $b );
+				}
+				if ( oli_acr_normalize_text( $a ) !== oli_acr_normalize_text( $b ) ) {
+					$same = false;
+					break;
+				}
+			}
+			if ( $same ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * Modèles par défaut : 2 relances de panier et 1 relance de commande en attente.
 	 *
-	 * @return array
+	 * @return array<mixed>
 	 */
 	public static function default_templates() {
 		$first  = array_merge(

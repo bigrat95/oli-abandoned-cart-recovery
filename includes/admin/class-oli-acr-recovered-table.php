@@ -3,6 +3,8 @@
  * Tableau d'admin (WP_List_Table) : liste des commandes récupérées.
  *
  * @package OliAbandonedCartRecovery
+ * @author  Olivier Bigras (bigrat95)
+ * @link    https://olivierbigras.com
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -32,7 +34,7 @@ class OLI_ACR_Recovered_Table extends WP_List_Table {
 	/**
 	 * Colonnes.
 	 *
-	 * @return array
+	 * @return array<mixed>
 	 */
 	public function get_columns() {
 		return array(
@@ -47,6 +49,8 @@ class OLI_ACR_Recovered_Table extends WP_List_Table {
 
 	/**
 	 * Prépare les lignes.
+	 *
+	 * @return void
 	 */
 	public function prepare_items() {
 		$per_page              = 20;
@@ -89,7 +93,7 @@ class OLI_ACR_Recovered_Table extends WP_List_Table {
 			case 'type':
 				return 'order' === $order->get_meta( '_oli_acr_recovered' ) ? esc_html__( 'Pending order', 'oli-abandoned-cart-recovery' ) : esc_html__( 'Abandoned cart', 'oli-abandoned-cart-recovery' );
 			case 'email':
-				return esc_html( $order->get_billing_email() );
+				return '<span class="oli-acr-email">' . esc_html( $order->get_billing_email() ) . '</span>';
 			case 'total':
 				return wp_kses_post( $order->get_formatted_order_total() );
 			case 'status':
@@ -102,6 +106,8 @@ class OLI_ACR_Recovered_Table extends WP_List_Table {
 
 	/**
 	 * Message vide.
+	 *
+	 * @return void
 	 */
 	public function no_items() {
 		esc_html_e( 'No recovered orders yet.', 'oli-abandoned-cart-recovery' );

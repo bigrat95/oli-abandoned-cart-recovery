@@ -3,6 +3,8 @@
  * Vie privée : exporteur, effaceur et texte suggéré pour la politique de confidentialité.
  *
  * @package OliAbandonedCartRecovery
+ * @author  Olivier Bigras (bigrat95)
+ * @link    https://olivierbigras.com
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -14,6 +16,8 @@ class OLI_ACR_Privacy {
 
 	/**
 	 * Accroches.
+	 *
+	 * @return void
 	 */
 	public static function init() {
 		add_filter( 'wp_privacy_personal_data_exporters', array( __CLASS__, 'register_exporter' ) );
@@ -24,8 +28,8 @@ class OLI_ACR_Privacy {
 	/**
 	 * Enregistre l'exporteur.
 	 *
-	 * @param array $exporters Exporteurs.
-	 * @return array
+	 * @param array<mixed> $exporters Exporteurs.
+	 * @return array<mixed>
 	 */
 	public static function register_exporter( $exporters ) {
 		$exporters['oli-abandoned-cart-recovery'] = array(
@@ -38,8 +42,8 @@ class OLI_ACR_Privacy {
 	/**
 	 * Enregistre l'effaceur.
 	 *
-	 * @param array $erasers Effaceurs.
-	 * @return array
+	 * @param array<mixed> $erasers Effaceurs.
+	 * @return array<mixed>
 	 */
 	public static function register_eraser( $erasers ) {
 		$erasers['oli-abandoned-cart-recovery'] = array(
@@ -54,7 +58,7 @@ class OLI_ACR_Privacy {
 	 *
 	 * @param string $email Courriel.
 	 * @param int    $page  Page.
-	 * @return array
+	 * @return array<mixed>
 	 */
 	public static function export( $email, $page = 1 ) {
 		global $wpdb;
@@ -65,7 +69,7 @@ class OLI_ACR_Privacy {
 		$limit  = 50;
 		$offset = ( max( 1, (int) $page ) - 1 ) * $limit;
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table() ou $wpdb->prefix avec un suffixe fixe, jamais une saisie.
 		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE email = %s ORDER BY id ASC LIMIT %d OFFSET %d", $email, $limit, $offset ) );
 		foreach ( (array) $rows as $row ) {
 			$products = array();
@@ -110,7 +114,7 @@ class OLI_ACR_Privacy {
 		}
 
 		if ( 1 === (int) $page ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table() ou $wpdb->prefix avec un suffixe fixe, jamais une saisie.
 			$logs = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$log} WHERE email = %s ORDER BY id ASC LIMIT 500", $email ) );
 			foreach ( (array) $logs as $row ) {
 				$items[] = array(
@@ -160,7 +164,7 @@ class OLI_ACR_Privacy {
 	 *
 	 * @param string $email Courriel.
 	 * @param int    $page  Page.
-	 * @return array
+	 * @return array<mixed>
 	 */
 	public static function erase( $email, $page = 1 ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- Signature imposée par WordPress.
 		global $wpdb;
@@ -183,6 +187,8 @@ class OLI_ACR_Privacy {
 
 	/**
 	 * Texte suggéré pour la politique de confidentialité.
+	 *
+	 * @return void
 	 */
 	public static function policy_content() {
 		if ( ! function_exists( 'wp_add_privacy_policy_content' ) ) {

@@ -3,6 +3,8 @@
  * Courriel WooCommerce : avis à l'admin quand un panier ou une commande en attente est récupéré.
  *
  * @package OliAbandonedCartRecovery
+ * @author  Olivier Bigras (bigrat95)
+ * @link    https://olivierbigras.com
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -77,6 +79,7 @@ class OLI_ACR_Email_Admin_Recovered extends WC_Email {
 	 *
 	 * @param WC_Order $order Commande.
 	 * @param string   $type  cart ou order.
+	 * @return void
 	 */
 	public function trigger( $order, $type = 'cart' ) {
 		$this->setup_locale();
@@ -136,6 +139,8 @@ class OLI_ACR_Email_Admin_Recovered extends WC_Email {
 
 	/**
 	 * Champs de réglages.
+	 *
+	 * @return void
 	 */
 	public function init_form_fields() {
 		parent::init_form_fields();

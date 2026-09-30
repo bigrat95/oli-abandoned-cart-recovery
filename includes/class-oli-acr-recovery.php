@@ -3,6 +3,8 @@
  * Liens de récupération, désabonnement et conversion des commandes.
  *
  * @package OliAbandonedCartRecovery
+ * @author  Olivier Bigras (bigrat95)
+ * @link    https://olivierbigras.com
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -14,6 +16,8 @@ class OLI_ACR_Recovery {
 
 	/**
 	 * Accroches.
+	 *
+	 * @return void
 	 */
 	public static function init() {
 		add_action( 'wp_loaded', array( __CLASS__, 'handle_links' ), 30 );
@@ -39,6 +43,8 @@ class OLI_ACR_Recovery {
 
 	/**
 	 * Traite les liens de récupération (panier) et de paiement (commande en attente).
+	 *
+	 * @return void
 	 */
 	public static function handle_links() {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- Liens publics signés par jeton aléatoire.
@@ -59,6 +65,7 @@ class OLI_ACR_Recovery {
 	 *
 	 * @param string $token  Jeton.
 	 * @param int    $log_id Journal.
+	 * @return void
 	 */
 	public static function recover_cart( $token, $log_id ) {
 		if ( is_admin() && ! wp_doing_ajax() ) {
@@ -142,6 +149,7 @@ class OLI_ACR_Recovery {
 	 *
 	 * @param string $key    Clé de commande.
 	 * @param int    $log_id Journal.
+	 * @return void
 	 */
 	public static function recover_order( $key, $log_id ) {
 		$order_id = wc_get_order_id_by_order_key( $key );
@@ -167,6 +175,8 @@ class OLI_ACR_Recovery {
 
 	/**
 	 * Page de désabonnement (confirmation par bouton pour éviter les clics des antipourriels).
+	 *
+	 * @return void
 	 */
 	public static function handle_unsubscribe() {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended
@@ -213,9 +223,10 @@ class OLI_ACR_Recovery {
 	/**
 	 * Commande du checkout classique.
 	 *
-	 * @param int      $order_id    ID.
-	 * @param array    $posted_data Données.
-	 * @param WC_Order $order       Commande.
+	 * @param int                  $order_id    ID.
+	 * @param array<string, mixed> $posted_data Données.
+	 * @param WC_Order             $order       Commande.
+	 * @return void
 	 */
 	public static function classic_order_processed( $order_id, $posted_data = array(), $order = null ) {
 		if ( ! $order instanceof WC_Order ) {
@@ -230,6 +241,7 @@ class OLI_ACR_Recovery {
 	 * Relie la commande au panier suivi (session, sinon courriel) et arrête les relances.
 	 *
 	 * @param WC_Order $order Commande.
+	 * @return void
 	 */
 	public static function link_order( $order ) {
 		if ( ! $order instanceof WC_Order ) {
@@ -286,6 +298,7 @@ class OLI_ACR_Recovery {
 	 * @param string   $from     Ancien statut.
 	 * @param string   $to       Nouveau statut.
 	 * @param WC_Order $order    Commande.
+	 * @return void
 	 */
 	public static function order_status_changed( $order_id, $from, $to, $order ) {
 		if ( ! in_array( $to, self::paid_statuses(), true ) || ! $order instanceof WC_Order ) {
@@ -303,6 +316,7 @@ class OLI_ACR_Recovery {
 	 * Marque le panier lié comme récupéré.
 	 *
 	 * @param WC_Order $order Commande.
+	 * @return void
 	 */
 	public static function mark_cart_recovered( $order ) {
 		global $wpdb;
@@ -331,7 +345,7 @@ class OLI_ACR_Recovery {
 		$log_id = absint( $order->get_meta( '_oli_acr_clicked_log' ) );
 		if ( ! $log_id ) {
 			$table = oli_acr_table( 'log' );
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table() ou $wpdb->prefix avec un suffixe fixe, jamais une saisie.
 			$log_id = (int) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE object_type = 'cart' AND object_id = %d ORDER BY id DESC LIMIT 1", $cart->id ) );
 		}
 		self::mark_log_recovered( $log_id, $order );
@@ -345,13 +359,14 @@ class OLI_ACR_Recovery {
 	 * Marque une commande en attente relancée comme récupérée.
 	 *
 	 * @param WC_Order $order Commande.
+	 * @return void
 	 */
 	public static function mark_order_recovered( $order ) {
 		global $wpdb;
 		$log_id = absint( $order->get_meta( '_oli_acr_clicked_log' ) );
 		if ( ! $log_id ) {
 			$table = oli_acr_table( 'log' );
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table() ou $wpdb->prefix avec un suffixe fixe, jamais une saisie.
 			$log_id = (int) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE object_type = 'order' AND object_id = %d ORDER BY id DESC LIMIT 1", $order->get_id() ) );
 		}
 		self::mark_log_recovered( $log_id, $order );
@@ -367,6 +382,7 @@ class OLI_ACR_Recovery {
 	 *
 	 * @param int      $log_id ID.
 	 * @param WC_Order $order  Commande.
+	 * @return void
 	 */
 	private static function mark_log_recovered( $log_id, $order ) {
 		global $wpdb;
@@ -390,6 +406,7 @@ class OLI_ACR_Recovery {
 	 *
 	 * @param WC_Order $order Commande.
 	 * @param string   $type  cart ou order.
+	 * @return void
 	 */
 	private static function notify_admin( $order, $type ) {
 		if ( 'yes' !== oli_acr_get_setting( 'admin_notify' ) ) {

@@ -3,6 +3,8 @@
  * Avis admin : vente récupérée (texte).
  *
  * @package OliAbandonedCartRecovery
+ * @author  Olivier Bigras (bigrat95)
+ * @link    https://olivierbigras.com
  * @var WC_Order $order
  * @var string   $recovery_type
  * @var string   $email_heading

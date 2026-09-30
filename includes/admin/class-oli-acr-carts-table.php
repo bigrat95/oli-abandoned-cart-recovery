@@ -3,6 +3,8 @@
  * Tableau d'admin (WP_List_Table) : liste des paniers suivis.
  *
  * @package OliAbandonedCartRecovery
+ * @author  Olivier Bigras (bigrat95)
+ * @link    https://olivierbigras.com
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -32,7 +34,7 @@ class OLI_ACR_Carts_Table extends WP_List_Table {
 	/**
 	 * Colonnes.
 	 *
-	 * @return array
+	 * @return array<mixed>
 	 */
 	public function get_columns() {
 		return array(
@@ -50,7 +52,7 @@ class OLI_ACR_Carts_Table extends WP_List_Table {
 	/**
 	 * Colonnes triables.
 	 *
-	 * @return array
+	 * @return array<mixed>
 	 */
 	protected function get_sortable_columns() {
 		return array(
@@ -63,7 +65,7 @@ class OLI_ACR_Carts_Table extends WP_List_Table {
 	/**
 	 * Actions groupées.
 	 *
-	 * @return array
+	 * @return array<mixed>
 	 */
 	protected function get_bulk_actions() {
 		return array( 'delete' => __( 'Delete', 'oli-abandoned-cart-recovery' ) );
@@ -72,7 +74,7 @@ class OLI_ACR_Carts_Table extends WP_List_Table {
 	/**
 	 * Vues par statut.
 	 *
-	 * @return array
+	 * @return array<mixed>
 	 */
 	protected function get_views() {
 		$counts  = OLI_ACR_Carts::count_by_status();
@@ -89,6 +91,8 @@ class OLI_ACR_Carts_Table extends WP_List_Table {
 
 	/**
 	 * Prépare les lignes.
+	 *
+	 * @return void
 	 */
 	public function prepare_items() {
 		global $wpdb;
@@ -117,7 +121,7 @@ class OLI_ACR_Carts_Table extends WP_List_Table {
 		$params[]     = $per_page;
 		$params[]     = ( $paged - 1 ) * $per_page;
 
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- $where ne contient que des marqueurs %s construits ci-dessus.
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where ne contient que des marqueurs %s construits ci-dessus.
 		$total       = (int) ( $params_count ? $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE {$where}", $params_count ) ) : $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" ) );
 		$this->items = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE {$where} ORDER BY {$orderby} {$order} LIMIT %d OFFSET %d", $params ) );
 		// phpcs:enable
@@ -148,7 +152,7 @@ class OLI_ACR_Carts_Table extends WP_List_Table {
 	 * @return string
 	 */
 	protected function column_email( $item ) {
-		$out  = '<strong>' . esc_html( $item->email ) . '</strong>';
+		$out  = '<strong class="oli-acr-email">' . esc_html( $item->email ) . '</strong>';
 		$name = trim( $item->first_name . ' ' . $item->last_name );
 		if ( $name ) {
 			$out .= '<br>' . esc_html( $name );
@@ -160,10 +164,10 @@ class OLI_ACR_Carts_Table extends WP_List_Table {
 			$out .= '<br><em>' . esc_html__( 'Registered customer', 'oli-abandoned-cart-recovery' ) . '</em>';
 		}
 		$actions = array();
-		if ( in_array( $item->status, array( 'abandoned', 'reminded', 'open' ), true ) ) {
-			$actions['send'] = '<a href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=oli_acr_cart_action&do=send&cart=' . $item->id ), 'oli_acr_cart_action' ) ) . '">' . esc_html__( 'Send next reminder now', 'oli-abandoned-cart-recovery' ) . '</a>';
+		if ( in_array( $item->status, OLI_ACR_Carts::LIVE_STATUSES, true ) && ! (int) $item->order_id && ! oli_acr_is_unsubscribed( $item->email ) ) {
+			$actions['send'] = '<a href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=oli_acr_cart_action&do=send&cart=' . $item->id ), 'oli_acr_cart_action_send_' . $item->id ) ) . '">' . esc_html__( 'Send next reminder now', 'oli-abandoned-cart-recovery' ) . '</a>';
 		}
-		$actions['delete'] = '<a class="submitdelete" href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=oli_acr_cart_action&do=delete&cart=' . $item->id ), 'oli_acr_cart_action' ) ) . '">' . esc_html__( 'Delete', 'oli-abandoned-cart-recovery' ) . '</a>';
+		$actions['delete'] = '<a class="submitdelete" href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=oli_acr_cart_action&do=delete&cart=' . $item->id ), 'oli_acr_cart_action_delete_' . $item->id ) ) . '">' . esc_html__( 'Delete', 'oli-abandoned-cart-recovery' ) . '</a>';
 		return $out . $this->row_actions( $actions );
 	}
 
@@ -205,6 +209,8 @@ class OLI_ACR_Carts_Table extends WP_List_Table {
 
 	/**
 	 * Message vide.
+	 *
+	 * @return void
 	 */
 	public function no_items() {
 		esc_html_e( 'No carts captured yet.', 'oli-abandoned-cart-recovery' );

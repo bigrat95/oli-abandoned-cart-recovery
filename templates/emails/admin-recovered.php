@@ -3,6 +3,8 @@
  * Avis admin : vente récupérée (HTML). Peut être surchargé dans le thème : woocommerce/emails/admin-recovered.php.
  *
  * @package OliAbandonedCartRecovery
+ * @author  Olivier Bigras (bigrat95)
+ * @link    https://olivierbigras.com
  * @var WC_Order $order
  * @var string   $recovery_type
  * @var string   $email_heading

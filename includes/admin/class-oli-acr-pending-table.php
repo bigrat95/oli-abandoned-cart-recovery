@@ -3,6 +3,8 @@
  * Tableau d'admin (WP_List_Table) : liste des commandes en attente suivies.
  *
  * @package OliAbandonedCartRecovery
+ * @author  Olivier Bigras (bigrat95)
+ * @link    https://olivierbigras.com
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -32,7 +34,7 @@ class OLI_ACR_Pending_Table extends WP_List_Table {
 	/**
 	 * Colonnes.
 	 *
-	 * @return array
+	 * @return array<mixed>
 	 */
 	public function get_columns() {
 		return array(
@@ -46,6 +48,8 @@ class OLI_ACR_Pending_Table extends WP_List_Table {
 
 	/**
 	 * Prépare les lignes.
+	 *
+	 * @return void
 	 */
 	public function prepare_items() {
 		$per_page              = 20;
@@ -80,7 +84,7 @@ class OLI_ACR_Pending_Table extends WP_List_Table {
 		switch ( $column_name ) {
 			case 'order':
 				$actions = array(
-					'send' => '<a href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=oli_acr_order_action&order=' . $order->get_id() ), 'oli_acr_order_action' ) ) . '">' . esc_html__( 'Send next reminder now', 'oli-abandoned-cart-recovery' ) . '</a>',
+					'send' => '<a href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=oli_acr_order_action&order=' . $order->get_id() ), 'oli_acr_order_action_' . $order->get_id() ) ) . '">' . esc_html__( 'Send next reminder now', 'oli-abandoned-cart-recovery' ) . '</a>',
 				);
 				return '<a href="' . esc_url( $order->get_edit_order_url() ) . '"><strong>#' . esc_html( $order->get_order_number() ) . '</strong></a>' . $this->row_actions( $actions );
 			case 'email':
@@ -98,6 +102,8 @@ class OLI_ACR_Pending_Table extends WP_List_Table {
 
 	/**
 	 * Message vide.
+	 *
+	 * @return void
 	 */
 	public function no_items() {
 		esc_html_e( 'No pending orders.', 'oli-abandoned-cart-recovery' );

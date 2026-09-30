@@ -3,6 +3,8 @@
  * Accès aux données des paniers suivis (table maison).
  *
  * @package OliAbandonedCartRecovery
+ * @author  Olivier Bigras (bigrat95)
+ * @link    https://olivierbigras.com
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -33,7 +35,7 @@ class OLI_ACR_Carts {
 	public static function get( $id ) {
 		global $wpdb;
 		$table = oli_acr_table( 'carts' );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table() ou $wpdb->prefix avec un suffixe fixe, jamais une saisie.
 		return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $id ) );
 	}
 
@@ -50,7 +52,7 @@ class OLI_ACR_Carts {
 			return null;
 		}
 		$table = oli_acr_table( 'carts' );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table() ou $wpdb->prefix avec un suffixe fixe, jamais une saisie.
 		return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE token = %s", $token ) );
 	}
 
@@ -63,7 +65,7 @@ class OLI_ACR_Carts {
 	public static function find_live_by_email( $email ) {
 		global $wpdb;
 		$table = oli_acr_table( 'carts' );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table() ou $wpdb->prefix avec un suffixe fixe, jamais une saisie.
 		return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE email = %s AND status IN ('open','abandoned','reminded') ORDER BY id DESC LIMIT 1", strtolower( $email ) ) );
 	}
 
@@ -79,15 +81,15 @@ class OLI_ACR_Carts {
 			return null;
 		}
 		$table = oli_acr_table( 'carts' );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table() ou $wpdb->prefix avec un suffixe fixe, jamais une saisie.
 		return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE session_key = %s AND status IN ('open','abandoned','reminded') ORDER BY id DESC LIMIT 1", (string) $session_key ) );
 	}
 
 	/**
 	 * Met à jour un panier.
 	 *
-	 * @param int   $id   ID.
-	 * @param array $data Colonnes.
+	 * @param int          $id   ID.
+	 * @param array<mixed> $data Colonnes.
 	 * @return bool
 	 */
 	public static function update( $id, $data ) {
@@ -100,6 +102,7 @@ class OLI_ACR_Carts {
 	 * Supprime un panier et son journal.
 	 *
 	 * @param int $id ID.
+	 * @return void
 	 */
 	public static function delete( $id ) {
 		global $wpdb;
@@ -118,7 +121,7 @@ class OLI_ACR_Carts {
 	/**
 	 * Photo du panier WooCommerce courant.
 	 *
-	 * @return array{items: array, count: int, total: float, hash: string}
+	 * @return array{items: array<int, array<string, mixed>>, count: int, total: float, hash: string}
 	 */
 	public static function snapshot() {
 		$items = array();
@@ -166,7 +169,7 @@ class OLI_ACR_Carts {
 	/**
 	 * Crée ou met à jour le panier suivi du visiteur courant.
 	 *
-	 * @param array $contact email, phone, first_name, last_name, consent, user_id.
+	 * @param array<mixed> $contact email, phone, first_name, last_name, consent, user_id.
 	 * @return int ID du panier ou 0.
 	 */
 	public static function upsert_current( $contact ) {
@@ -255,23 +258,24 @@ class OLI_ACR_Carts {
 	 * Marque comme désabonnés les paniers vivants d'un courriel.
 	 *
 	 * @param string $email Courriel.
+	 * @return void
 	 */
 	public static function mark_unsubscribed( $email ) {
 		global $wpdb;
 		$table = oli_acr_table( 'carts' );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table() ou $wpdb->prefix avec un suffixe fixe, jamais une saisie.
 		$wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status = 'unsubscribed', next_send_at = NULL WHERE email = %s AND status IN ('open','abandoned','reminded')", strtolower( $email ) ) );
 	}
 
 	/**
 	 * Nombre de paniers par statut.
 	 *
-	 * @return array
+	 * @return array<mixed>
 	 */
 	public static function count_by_status() {
 		global $wpdb;
 		$table = oli_acr_table( 'carts' );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table() ou $wpdb->prefix avec un suffixe fixe, jamais une saisie.
 		$rows = $wpdb->get_results( "SELECT status, COUNT(*) AS total FROM {$table} GROUP BY status" );
 		$out  = array_fill_keys( array_keys( oli_acr_statuses() ), 0 );
 		foreach ( (array) $rows as $row ) {
@@ -284,7 +288,7 @@ class OLI_ACR_Carts {
 	 * Articles décodés d'un panier.
 	 *
 	 * @param object $cart Ligne.
-	 * @return array
+	 * @return array<mixed>
 	 */
 	public static function items( $cart ) {
 		$items = json_decode( (string) $cart->cart_contents, true );

@@ -4,6 +4,8 @@
  * commandes en attente et nettoyage. Action Scheduler, ou WP-Cron en secours.
  *
  * @package OliAbandonedCartRecovery
+ * @author  Olivier Bigras (bigrat95)
+ * @link    https://olivierbigras.com
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -19,6 +21,8 @@ class OLI_ACR_Scheduler {
 
 	/**
 	 * Accroches.
+	 *
+	 * @return void
 	 */
 	public static function init() {
 		add_action( self::HOOK_PROCESS, array( __CLASS__, 'process' ) );
@@ -39,8 +43,8 @@ class OLI_ACR_Scheduler {
 	/**
 	 * Intervalle WP-Cron maison (secours).
 	 *
-	 * @param array $schedules Intervalles.
-	 * @return array
+	 * @param array<mixed> $schedules Intervalles.
+	 * @return array<mixed>
 	 */
 	public static function cron_schedules( $schedules ) {
 		$schedules['oli_acr_interval'] = array(
@@ -52,6 +56,8 @@ class OLI_ACR_Scheduler {
 
 	/**
 	 * Planifie les tâches si la signature (intervalle + moteur) a changé. Aucun coût au front sinon.
+	 *
+	 * @return void
 	 */
 	public static function maybe_schedule() {
 		$engine    = function_exists( 'as_schedule_recurring_action' ) ? 'as' : 'wpcron';
@@ -72,6 +78,8 @@ class OLI_ACR_Scheduler {
 
 	/**
 	 * Retire toutes les tâches planifiées.
+	 *
+	 * @return void
 	 */
 	public static function unschedule_all() {
 		if ( function_exists( 'as_unschedule_all_actions' ) ) {
@@ -98,6 +106,8 @@ class OLI_ACR_Scheduler {
 
 	/**
 	 * Traitement récurrent.
+	 *
+	 * @return void
 	 */
 	public static function process() {
 		if ( get_transient( 'oli_acr_lock' ) ) {
@@ -126,7 +136,7 @@ class OLI_ACR_Scheduler {
 		$table  = oli_acr_table( 'carts' );
 		$cutoff = oli_acr_now( -1 * oli_acr_duration_to_seconds( oli_acr_get_setting( 'abandon_after' ) ) );
 		$now    = oli_acr_now();
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table() ou $wpdb->prefix avec un suffixe fixe, jamais une saisie.
 		return (int) $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status = 'abandoned', abandoned_at = %s, next_send_at = %s WHERE status = 'open' AND updated_at <= %s AND item_count > 0 AND order_id = 0 AND email <> '' LIMIT 500", $now, $now, $cutoff ) );
 	}
 
@@ -143,7 +153,7 @@ class OLI_ACR_Scheduler {
 		}
 		$table = oli_acr_table( 'carts' );
 		$now   = oli_acr_now();
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table() ou $wpdb->prefix avec un suffixe fixe, jamais une saisie.
 		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE status IN ('abandoned','reminded') AND next_send_at IS NOT NULL AND next_send_at <= %s ORDER BY next_send_at ASC LIMIT %d", $now, self::batch_size() ) );
 		$sent = 0;
 
@@ -180,11 +190,11 @@ class OLI_ACR_Scheduler {
 	/**
 	 * Premier modèle non encore envoyé.
 	 *
-	 * @param array $templates Modèles triés.
-	 * @param array $done      IDs déjà envoyés.
-	 * @return array|null
+	 * @param array<mixed> $templates Modèles triés.
+	 * @param array<mixed> $done      IDs déjà envoyés.
+	 * @return array<mixed>|null
 	 */
-	private static function next_template( $templates, $done ) {
+	public static function next_template( $templates, $done ) {
 		foreach ( $templates as $id => $tpl ) {
 			if ( ! in_array( $id, $done, true ) ) {
 				$tpl['id'] = $id;
@@ -270,6 +280,8 @@ class OLI_ACR_Scheduler {
 
 	/**
 	 * Nettoyage quotidien : vieux paniers, commandes en attente suivies, coupons, conservation.
+	 *
+	 * @return void
 	 */
 	public static function daily_cleanup() {
 		self::cleanup_carts();
@@ -290,7 +302,7 @@ class OLI_ACR_Scheduler {
 
 		$after = oli_acr_duration_to_seconds( oli_acr_get_setting( 'delete_carts_after' ) );
 		if ( $after > 0 ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table() ou $wpdb->prefix avec un suffixe fixe, jamais une saisie.
 			$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM {$carts} WHERE status IN ('open','abandoned','reminded') AND updated_at <= %s LIMIT 1000", oli_acr_now( -1 * $after ) ) );
 			foreach ( $ids as $id ) {
 				OLI_ACR_Carts::delete( $id );
@@ -301,7 +313,7 @@ class OLI_ACR_Scheduler {
 		$days = absint( oli_acr_get_setting( 'retention_days' ) );
 		if ( $days > 0 ) {
 			$limit = oli_acr_now( -1 * $days * DAY_IN_SECONDS );
-			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Noms de table fixes (oli_acr_table()), valeurs passées par prepare().
 			$deleted += (int) $wpdb->query( $wpdb->prepare( "DELETE FROM {$carts} WHERE updated_at <= %s LIMIT 1000", $limit ) );
 			$wpdb->query( $wpdb->prepare( "DELETE FROM {$log} WHERE sent_at <= %s LIMIT 5000", $limit ) );
 			// phpcs:enable

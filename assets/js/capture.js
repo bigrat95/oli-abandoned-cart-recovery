@@ -36,12 +36,29 @@
 		if ( ! EMAIL_RE.test( email ) ) {
 			return;
 		}
+		// Loi 25 : sans consentement, aucune donnée personnelle n'est transmise (seulement le retrait).
+		// wp_localize_script transmet les valeurs en chaînes (« 0 » ou « 1 »).
+		var needConsent = String( cfg.consent ) === '1';
+		if ( needConsent && ! consentGiven() ) {
+			if ( lastPayload === 'no-consent' ) {
+				return;
+			}
+			var wasSent = lastPayload !== '';
+			lastPayload = 'no-consent';
+			if ( wasSent ) {
+				var withdraw = new window.FormData();
+				withdraw.append( 'nonce', cfg.nonce );
+				withdraw.append( 'consent', '0' );
+				window.fetch( cfg.endpoint, { method: 'POST', credentials: 'same-origin', body: withdraw } );
+			}
+			return;
+		}
 		var data = {
 			email: email,
 			phone: val( SELECTORS.phone ),
 			first_name: val( SELECTORS.first ),
 			last_name: val( SELECTORS.last ),
-			consent: cfg.consent ? ( consentGiven() ? '1' : '0' ) : '1'
+			consent: needConsent ? ( consentGiven() ? '1' : '0' ) : '1'
 		};
 		var payload = JSON.stringify( data );
 		if ( payload === lastPayload ) {

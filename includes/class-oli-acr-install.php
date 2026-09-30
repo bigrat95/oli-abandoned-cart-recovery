@@ -3,6 +3,8 @@
  * Installation : tables, capacités, réglages et modèles par défaut.
  *
  * @package OliAbandonedCartRecovery
+ * @author  Olivier Bigras (bigrat95)
+ * @link    https://olivierbigras.com
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -14,6 +16,8 @@ class OLI_ACR_Install {
 
 	/**
 	 * Activation du plugin.
+	 *
+	 * @return void
 	 */
 	public static function activate() {
 		self::create_tables();
@@ -33,6 +37,8 @@ class OLI_ACR_Install {
 
 	/**
 	 * Désactivation : on retire les tâches planifiées, on garde les données.
+	 *
+	 * @return void
 	 */
 	public static function deactivate() {
 		OLI_ACR_Scheduler::unschedule_all();
@@ -41,6 +47,8 @@ class OLI_ACR_Install {
 
 	/**
 	 * Mise à jour du schéma si la version a changé.
+	 *
+	 * @return void
 	 */
 	public static function maybe_upgrade() {
 		if ( get_option( 'oli_acr_db_version' ) !== OLI_ACR_DB_VERSION ) {
@@ -51,6 +59,8 @@ class OLI_ACR_Install {
 
 	/**
 	 * Crée ou met à jour les tables avec dbDelta.
+	 *
+	 * @return void
 	 */
 	public static function create_tables() {
 		global $wpdb;
@@ -122,6 +132,8 @@ CREATE TABLE {$log} (
 
 	/**
 	 * Ajoute la capacité dédiée aux administrateurs (et au shop_manager si permis).
+	 *
+	 * @return void
 	 */
 	public static function add_caps() {
 		$admin = get_role( 'administrator' );
@@ -133,6 +145,8 @@ CREATE TABLE {$log} (
 
 	/**
 	 * Synchronise la capacité du rôle shop_manager avec le réglage.
+	 *
+	 * @return void
 	 */
 	public static function sync_shop_manager_cap() {
 		$role = get_role( 'shop_manager' );

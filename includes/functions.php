@@ -3,6 +3,8 @@
  * Fonctions utilitaires partagées.
  *
  * @package OliAbandonedCartRecovery
+ * @author  Olivier Bigras (bigrat95)
+ * @link    https://olivierbigras.com
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -10,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Valeurs par défaut des réglages.
  *
- * @return array
+ * @return array<mixed>
  */
 function oli_acr_default_settings() {
 	return array(
@@ -19,7 +21,8 @@ function oli_acr_default_settings() {
 			'value' => 60,
 			'unit'  => 'minutes',
 		),
-		'guest_tracking'        => 'always',
+		// Loi 25 (Québec) et RGPD : rien n'est capté pour un visiteur sans son consentement explicite.
+		'guest_tracking'        => 'consent',
 		'consent_text'          => '',
 		'roles_mode'            => 'all',
 		'roles'                 => array(),
@@ -50,13 +53,14 @@ function oli_acr_default_settings() {
 		'coupon_delete_used'    => 'yes',
 		'coupon_delete_expired' => 'yes',
 		'shop_manager_access'   => 'no',
+		'keep_data'             => 'no',
 	);
 }
 
 /**
  * Retourne tous les réglages fusionnés avec les valeurs par défaut.
  *
- * @return array
+ * @return array<mixed>
  */
 function oli_acr_settings() {
 	$saved = get_option( 'oli_acr_settings', array() );
@@ -78,19 +82,116 @@ function oli_acr_get_setting( $key ) {
 }
 
 /**
- * Texte de consentement (réglage, sinon texte par défaut traduit).
+ * Texte de consentement par défaut, traduit dans la langue courante.
+ *
+ * @return string
+ */
+function oli_acr_default_consent_text() {
+	return __( 'Save my email and cart so the store can remind me about my order.', 'oli-abandoned-cart-recovery' );
+}
+
+/**
+ * Texte de consentement (réglage personnalisé, sinon texte par défaut traduit dans la langue courante).
+ *
+ * Un texte enregistré identique au texte par défaut d'une des langues installées est traité comme
+ * le texte par défaut : il suit alors la langue du visiteur.
  *
  * @return string
  */
 function oli_acr_consent_text() {
 	$text = (string) oli_acr_get_setting( 'consent_text' );
-	return '' !== trim( $text ) ? $text : __( 'Save my email and cart so the store can remind me about my order.', 'oli-abandoned-cart-recovery' );
+	if ( '' === trim( $text ) || oli_acr_is_default_consent_text( $text ) ) {
+		return oli_acr_default_consent_text();
+	}
+	return $text;
+}
+
+/**
+ * Indique si un texte correspond au texte de consentement par défaut dans une des langues connues.
+ *
+ * @param string $text Texte.
+ * @return bool
+ */
+function oli_acr_is_default_consent_text( $text ) {
+	static $defaults = null;
+	if ( null === $defaults ) {
+		$defaults = array();
+		foreach ( oli_acr_known_locales() as $locale ) {
+			$defaults[] = oli_acr_normalize_text( oli_acr_in_locale( $locale, 'oli_acr_default_consent_text' ) );
+		}
+	}
+	return in_array( oli_acr_normalize_text( $text ), $defaults, true );
+}
+
+/**
+ * Normalise un texte pour comparer deux versions (espaces et balises de saut de ligne).
+ *
+ * @param string $text Texte.
+ * @return string
+ */
+function oli_acr_normalize_text( $text ) {
+	$text = str_replace( array( '<br />', '<br/>' ), '<br>', (string) $text );
+	return (string) preg_replace( '/\s+/u', '', $text );
+}
+
+/**
+ * Langues connues du site : en_US, la langue du site et les langues installées.
+ *
+ * @return array<int, string>
+ */
+function oli_acr_known_locales() {
+	$locales = array_merge( array( 'en_US', get_locale() ), get_available_languages() );
+	return array_values( array_unique( array_filter( $locales ) ) );
+}
+
+/**
+ * Convertit une langue enregistrée (fr_CA, en_US, ou un code court WPML / Polylang comme « fr »)
+ * en locale installée, ou chaîne vide si elle n'est pas disponible.
+ *
+ * @param string $language Langue enregistrée.
+ * @return string
+ */
+function oli_acr_locale_from_language( $language ) {
+	$language = str_replace( '-', '_', trim( (string) $language ) );
+	if ( '' === $language ) {
+		return '';
+	}
+	$locales = oli_acr_known_locales();
+	if ( in_array( $language, $locales, true ) ) {
+		return $language;
+	}
+	foreach ( $locales as $locale ) {
+		if ( 0 === stripos( $locale, substr( $language, 0, 2 ) ) ) {
+			return $locale;
+		}
+	}
+	return '';
+}
+
+/**
+ * Exécute une fonction dans une autre langue (switch_to_locale, puis restore_previous_locale).
+ *
+ * @param string   $locale   Locale voulue (vide = langue courante).
+ * @param callable $callback Fonction.
+ * @param mixed    ...$args  Arguments.
+ * @return mixed
+ */
+function oli_acr_in_locale( $locale, $callback, ...$args ) {
+	$locale   = oli_acr_locale_from_language( $locale );
+	$switched = '' !== $locale && determine_locale() !== $locale && switch_to_locale( $locale );
+	try {
+		return call_user_func_array( $callback, $args );
+	} finally {
+		if ( $switched ) {
+			restore_previous_locale();
+		}
+	}
 }
 
 /**
  * Unités de durée permises.
  *
- * @return array
+ * @return array<mixed>
  */
 function oli_acr_duration_units() {
 	return array(
@@ -103,7 +204,7 @@ function oli_acr_duration_units() {
 /**
  * Convertit une durée (valeur + unité) en secondes.
  *
- * @param array|int $duration Durée.
+ * @param array<mixed>|int $duration Durée.
  * @return int
  */
 function oli_acr_duration_to_seconds( $duration ) {
@@ -127,7 +228,7 @@ function oli_acr_duration_to_seconds( $duration ) {
  *
  * @param mixed $raw Valeur brute.
  * @param int   $min Minimum permis.
- * @return array
+ * @return array<mixed>
  */
 function oli_acr_sanitize_duration( $raw, $min = 0 ) {
 	$raw   = is_array( $raw ) ? $raw : array();
@@ -155,7 +256,7 @@ function oli_acr_now( $offset = 0 ) {
 /**
  * Libellés des statuts de panier.
  *
- * @return array
+ * @return array<mixed>
  */
 function oli_acr_statuses() {
 	return array(
@@ -170,7 +271,7 @@ function oli_acr_statuses() {
 /**
  * Liste d'exclusion (courriels désabonnés), en minuscules.
  *
- * @return array
+ * @return array<mixed>
  */
 function oli_acr_get_blocklist() {
 	$list = get_option( 'oli_acr_blocklist', array() );
@@ -287,6 +388,7 @@ function oli_acr_current_language() {
  *
  * @param string $message Message.
  * @param string $level   Niveau.
+ * @return void
  */
 function oli_acr_log( $message, $level = 'info' ) {
 	/**

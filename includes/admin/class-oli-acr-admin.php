@@ -3,6 +3,8 @@
  * Interface d'administration sous le menu WooCommerce.
  *
  * @package OliAbandonedCartRecovery
+ * @author  Olivier Bigras (bigrat95)
+ * @link    https://olivierbigras.com
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -21,6 +23,8 @@ class OLI_ACR_Admin {
 
 	/**
 	 * Accroches.
+	 *
+	 * @return void
 	 */
 	public static function init() {
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ), 60 );
@@ -37,8 +41,8 @@ class OLI_ACR_Admin {
 	/**
 	 * Lien « Réglages » dans la liste des extensions.
 	 *
-	 * @param array $links Liens.
-	 * @return array
+	 * @param array<mixed> $links Liens.
+	 * @return array<mixed>
 	 */
 	public static function action_links( $links ) {
 		array_unshift( $links, '<a href="' . esc_url( self::url( 'settings' ) ) . '">' . esc_html__( 'Settings', 'oli-abandoned-cart-recovery' ) . '</a>' );
@@ -48,8 +52,8 @@ class OLI_ACR_Admin {
 	/**
 	 * URL d'un onglet.
 	 *
-	 * @param string $tab  Onglet.
-	 * @param array  $args Arguments.
+	 * @param string       $tab  Onglet.
+	 * @param array<mixed> $args Arguments.
 	 * @return string
 	 */
 	public static function url( $tab = 'dashboard', $args = array() ) {
@@ -58,6 +62,8 @@ class OLI_ACR_Admin {
 
 	/**
 	 * Sous-menu WooCommerce.
+	 *
+	 * @return void
 	 */
 	public static function menu() {
 		add_submenu_page( 'woocommerce', __( 'Abandoned Carts', 'oli-abandoned-cart-recovery' ), __( 'Abandoned Carts', 'oli-abandoned-cart-recovery' ), OLI_ACR_CAP, self::SLUG, array( __CLASS__, 'render' ) );
@@ -67,6 +73,7 @@ class OLI_ACR_Admin {
 	 * Styles d'admin.
 	 *
 	 * @param string $hook Écran.
+	 * @return void
 	 */
 	public static function assets( $hook ) {
 		if ( false === strpos( (string) $hook, self::SLUG ) ) {
@@ -78,7 +85,7 @@ class OLI_ACR_Admin {
 	/**
 	 * Onglets.
 	 *
-	 * @return array
+	 * @return array<mixed>
 	 */
 	public static function tabs() {
 		return array(
@@ -94,6 +101,8 @@ class OLI_ACR_Admin {
 
 	/**
 	 * Vérifie la capacité.
+	 *
+	 * @return void
 	 */
 	private static function check_cap() {
 		if ( ! current_user_can( OLI_ACR_CAP ) ) {
@@ -104,9 +113,10 @@ class OLI_ACR_Admin {
 	/**
 	 * Redirection avec message.
 	 *
-	 * @param string $tab  Onglet.
-	 * @param string $msg  Code du message.
-	 * @param array  $args Arguments.
+	 * @param string               $tab  Onglet.
+	 * @param string               $msg  Code du message.
+	 * @param array<string, mixed> $args Arguments.
+	 * @return void
 	 */
 	private static function redirect( $tab, $msg, $args = array() ) {
 		wp_safe_redirect( self::url( $tab, array_merge( $args, array( 'oli_acr_msg' => $msg ) ) ) );
@@ -115,6 +125,8 @@ class OLI_ACR_Admin {
 
 	/**
 	 * Affiche la page.
+	 *
+	 * @return void
 	 */
 	public static function render() {
 		self::check_cap();
@@ -173,6 +185,7 @@ class OLI_ACR_Admin {
 	 * Messages.
 	 *
 	 * @param string $msg Code.
+	 * @return void
 	 */
 	private static function notice( $msg ) {
 		$messages = array(
@@ -192,6 +205,8 @@ class OLI_ACR_Admin {
 
 	/**
 	 * Suppression groupée.
+	 *
+	 * @return void
 	 */
 	private static function maybe_bulk_delete() {
 		$action = '';
@@ -216,6 +231,8 @@ class OLI_ACR_Admin {
 
 	/**
 	 * Onglet paniers.
+	 *
+	 * @return void
 	 */
 	private static function render_carts() {
 		$table = new OLI_ACR_Carts_Table();
@@ -234,6 +251,8 @@ class OLI_ACR_Admin {
 
 	/**
 	 * Onglet commandes en attente.
+	 *
+	 * @return void
 	 */
 	private static function render_pending() {
 		if ( 'yes' !== oli_acr_get_setting( 'pending_enabled' ) ) {
@@ -248,7 +267,7 @@ class OLI_ACR_Admin {
 	 * Statistiques pour une période.
 	 *
 	 * @param int $days Nombre de jours (0 = tout).
-	 * @return array
+	 * @return array<mixed>
 	 */
 	public static function stats( $days ) {
 		global $wpdb;
@@ -256,7 +275,7 @@ class OLI_ACR_Admin {
 		$log   = oli_acr_table( 'log' );
 		$since = $days > 0 ? oli_acr_now( -1 * $days * DAY_IN_SECONDS ) : '1970-01-01 00:00:00';
 
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Noms de table fixes (oli_acr_table()), valeurs passées par prepare().
 		$abandoned = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$carts} WHERE abandoned_at >= %s", $since ) );
 		$emails    = $wpdb->get_row( $wpdb->prepare( "SELECT COUNT(*) AS sent, SUM(clicked_at IS NOT NULL) AS clicked FROM {$log} WHERE sent_at >= %s", $since ) );
 		$pending   = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(DISTINCT object_id) FROM {$log} WHERE object_type = 'order' AND sent_at >= %s", $since ) );
@@ -283,6 +302,8 @@ class OLI_ACR_Admin {
 
 	/**
 	 * Onglet tableau de bord et rapports.
+	 *
+	 * @return void
 	 */
 	private static function render_dashboard() {
 		global $wpdb;
@@ -334,7 +355,7 @@ class OLI_ACR_Admin {
 		$log    = oli_acr_table( 'log' );
 		$offset = (int) wp_timezone()->getOffset( new DateTime( 'now', new DateTimeZone( 'UTC' ) ) );
 		$since  = $days > 0 ? oli_acr_now( -1 * $days * DAY_IN_SECONDS ) : '1970-01-01 00:00:00';
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table fixe (oli_acr_table()), valeurs passées par prepare().
 		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT DATE(DATE_ADD(sent_at, INTERVAL %d SECOND)) AS day, COUNT(*) AS sent, SUM(clicked_at IS NOT NULL) AS clicked, SUM(recovered_at IS NOT NULL) AS recovered, SUM(recovered_total) AS amount FROM {$log} WHERE sent_at >= %s GROUP BY day ORDER BY day DESC LIMIT 400", $offset, $since ) );
 
 		echo '<h2>' . esc_html__( 'Report by day', 'oli-abandoned-cart-recovery' ) . '</h2>';
@@ -348,7 +369,7 @@ class OLI_ACR_Admin {
 		echo '</tbody></table>';
 
 		// Rapport par modèle.
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table fixe (oli_acr_table()), valeurs passées par prepare().
 		$by_tpl = $wpdb->get_results( $wpdb->prepare( "SELECT template_id, COUNT(*) AS sent, SUM(clicked_at IS NOT NULL) AS clicked, SUM(recovered_at IS NOT NULL) AS recovered, SUM(recovered_total) AS amount FROM {$log} WHERE sent_at >= %s GROUP BY template_id", $since ) );
 		echo '<h2>' . esc_html__( 'Report by template', 'oli-abandoned-cart-recovery' ) . '</h2>';
 		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Template', 'oli-abandoned-cart-recovery' ) . '</th><th>' . esc_html__( 'Emails sent', 'oli-abandoned-cart-recovery' ) . '</th><th>' . esc_html__( 'Clicks', 'oli-abandoned-cart-recovery' ) . '</th><th>' . esc_html__( 'Recovered', 'oli-abandoned-cart-recovery' ) . '</th><th>' . esc_html__( 'Recovered revenue', 'oli-abandoned-cart-recovery' ) . '</th></tr></thead><tbody>';
@@ -365,8 +386,9 @@ class OLI_ACR_Admin {
 	/**
 	 * Champ de durée.
 	 *
-	 * @param string $name  Nom du champ.
-	 * @param array  $value Valeur.
+	 * @param string               $name  Nom du champ.
+	 * @param array<string, mixed> $value Valeur.
+	 * @return void
 	 */
 	private static function duration_field( $name, $value ) {
 		$value = wp_parse_args(
@@ -390,6 +412,7 @@ class OLI_ACR_Admin {
 	 * @param string $name    Nom.
 	 * @param string $value   Valeur.
 	 * @param string $label   Libellé.
+	 * @return void
 	 */
 	private static function checkbox( $name, $value, $label ) {
 		printf( '<label><input type="checkbox" name="%s" value="yes"%s> %s</label>', esc_attr( $name ), checked( 'yes', $value, false ), esc_html( $label ) );
@@ -397,6 +420,8 @@ class OLI_ACR_Admin {
 
 	/**
 	 * Onglet réglages.
+	 *
+	 * @return void
 	 */
 	private static function render_settings() {
 		$s = oli_acr_settings();
@@ -413,15 +438,15 @@ class OLI_ACR_Admin {
 		echo '<p class="description">' . esc_html__( 'Time without activity before an active cart becomes abandoned. Template delays are counted from that moment.', 'oli-abandoned-cart-recovery' ) . '</p></td></tr>';
 		echo '<tr><th>' . esc_html__( 'Guest carts', 'oli-abandoned-cart-recovery' ) . '</th><td><select name="s[guest_tracking]">';
 		$modes = array(
-			'always'  => __( 'Always capture guest carts', 'oli-abandoned-cart-recovery' ),
-			'consent' => __( 'Only when the guest checks the consent box', 'oli-abandoned-cart-recovery' ),
+			'consent' => __( 'Only when the guest checks the consent box (default, recommended for Quebec Law 25 and GDPR)', 'oli-abandoned-cart-recovery' ),
+			'always'  => __( 'Always capture guest carts (without consent)', 'oli-abandoned-cart-recovery' ),
 			'never'   => __( 'Never (registered customers only)', 'oli-abandoned-cart-recovery' ),
 		);
 		foreach ( $modes as $key => $label ) {
 			printf( '<option value="%s"%s>%s</option>', esc_attr( $key ), selected( $s['guest_tracking'], $key, false ), esc_html( $label ) );
 		}
 		echo '</select></td></tr>';
-		echo '<tr><th>' . esc_html__( 'Consent text', 'oli-abandoned-cart-recovery' ) . '</th><td><textarea name="s[consent_text]" rows="2" class="large-text">' . esc_textarea( oli_acr_consent_text() ) . '</textarea><p class="description">' . esc_html__( 'Label of the checkbox shown under the email field (consent mode).', 'oli-abandoned-cart-recovery' ) . '</p></td></tr>';
+		echo '<tr><th>' . esc_html__( 'Consent text', 'oli-abandoned-cart-recovery' ) . '</th><td><textarea name="s[consent_text]" rows="2" class="large-text" placeholder="' . esc_attr( oli_acr_default_consent_text() ) . '">' . esc_textarea( oli_acr_is_default_consent_text( (string) $s['consent_text'] ) ? '' : (string) $s['consent_text'] ) . '</textarea><p class="description">' . esc_html__( 'Label of the checkbox shown under the email field (consent mode). Leave empty to use the default text, translated in each visitor\'s language.', 'oli-abandoned-cart-recovery' ) . '</p></td></tr>';
 		echo '<tr><th>' . esc_html__( 'Registered customers tracked', 'oli-abandoned-cart-recovery' ) . '</th><td>';
 		printf( '<label><input type="radio" name="s[roles_mode]" value="all"%s> %s</label><br>', checked( 'all', $s['roles_mode'], false ), esc_html__( 'All roles', 'oli-abandoned-cart-recovery' ) );
 		printf( '<label><input type="radio" name="s[roles_mode]" value="selected"%s> %s</label><br>', checked( 'selected', $s['roles_mode'], false ), esc_html__( 'Only these roles:', 'oli-abandoned-cart-recovery' ) );
@@ -466,6 +491,9 @@ class OLI_ACR_Admin {
 		self::duration_field( 's[delete_carts_after]', $s['delete_carts_after'] );
 		echo '<p class="description">' . esc_html__( '0 = never. Active, abandoned and reminded carts older than this are deleted daily.', 'oli-abandoned-cart-recovery' ) . '</p></td></tr>';
 		printf( '<tr><th>%s</th><td><input type="number" min="0" class="small-text" name="s[retention_days]" value="%d"> %s<p class="description">%s</p></td></tr>', esc_html__( 'Keep all data (including recovered carts and email log) for', 'oli-abandoned-cart-recovery' ), (int) $s['retention_days'], esc_html__( 'days', 'oli-abandoned-cart-recovery' ), esc_html__( '0 = forever.', 'oli-abandoned-cart-recovery' ) );
+		echo '<tr><th>' . esc_html__( 'Uninstall', 'oli-abandoned-cart-recovery' ) . '</th><td>';
+		self::checkbox( 's[keep_data]', $s['keep_data'], __( 'Keep the data when the plugin is deleted (settings, templates, carts, email log)', 'oli-abandoned-cart-recovery' ) );
+		echo '<p class="description">' . esc_html__( 'Off by default: deleting the plugin removes all its data.', 'oli-abandoned-cart-recovery' ) . '</p></td></tr>';
 		echo '<tr><th>' . esc_html__( 'Unsubscribed / excluded emails', 'oli-abandoned-cart-recovery' ) . '</th><td><textarea name="blocklist" rows="5" class="large-text code">' . esc_textarea( implode( "\n", oli_acr_get_blocklist() ) ) . '</textarea><p class="description">' . esc_html__( 'One email per line. These addresses are never tracked or emailed.', 'oli-abandoned-cart-recovery' ) . '</p></td></tr>';
 		echo '</table>';
 
@@ -481,6 +509,8 @@ class OLI_ACR_Admin {
 
 	/**
 	 * Enregistre les réglages.
+	 *
+	 * @return void
 	 */
 	public static function save_settings() {
 		self::check_cap();
@@ -488,7 +518,7 @@ class OLI_ACR_Admin {
 		$raw  = isset( $_POST['s'] ) && is_array( $_POST['s'] ) ? wp_unslash( $_POST['s'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Nettoyé champ par champ ci-dessous.
 		$old  = oli_acr_settings();
 		$new  = $old;
-		$yesn = array( 'enabled', 'pending_enabled', 'admin_notify', 'coupon_delete_used', 'coupon_delete_expired' );
+		$yesn = array( 'enabled', 'pending_enabled', 'admin_notify', 'coupon_delete_used', 'coupon_delete_expired', 'keep_data' );
 		foreach ( $yesn as $key ) {
 			$new[ $key ] = ! empty( $raw[ $key ] ) ? 'yes' : 'no';
 		}
@@ -501,15 +531,19 @@ class OLI_ACR_Admin {
 		$new['cron_interval']        = oli_acr_sanitize_duration( isset( $raw['cron_interval'] ) ? $raw['cron_interval'] : array(), 1 );
 		$new['delete_carts_after']   = oli_acr_sanitize_duration( isset( $raw['delete_carts_after'] ) ? $raw['delete_carts_after'] : array() );
 		$new['retention_days']       = isset( $raw['retention_days'] ) ? absint( $raw['retention_days'] ) : 0;
-		$new['guest_tracking']       = isset( $raw['guest_tracking'] ) && in_array( $raw['guest_tracking'], array( 'always', 'consent', 'never' ), true ) ? $raw['guest_tracking'] : 'always';
+		$new['guest_tracking']       = isset( $raw['guest_tracking'] ) && in_array( $raw['guest_tracking'], array( 'always', 'consent', 'never' ), true ) ? $raw['guest_tracking'] : 'consent';
 		$new['consent_text']         = isset( $raw['consent_text'] ) ? sanitize_textarea_field( $raw['consent_text'] ) : '';
-		$new['roles_mode']           = isset( $raw['roles_mode'] ) && 'selected' === $raw['roles_mode'] ? 'selected' : 'all';
-		$new['roles']                = isset( $raw['roles'] ) ? array_values( array_intersect( array_map( 'sanitize_key', (array) $raw['roles'] ), array_keys( wp_roles()->get_names() ) ) ) : array();
-		$new['sender_name']          = isset( $raw['sender_name'] ) ? sanitize_text_field( $raw['sender_name'] ) : '';
-		$new['sender_email']         = isset( $raw['sender_email'] ) ? sanitize_email( $raw['sender_email'] ) : '';
-		$new['reply_to']             = isset( $raw['reply_to'] ) ? sanitize_email( $raw['reply_to'] ) : '';
-		$new['admin_recipient']      = isset( $raw['admin_recipient'] ) ? implode( ',', array_filter( array_map( 'sanitize_email', explode( ',', $raw['admin_recipient'] ) ) ) ) : '';
-		$new['coupon_prefix']        = isset( $raw['coupon_prefix'] ) ? strtoupper( preg_replace( '/[^A-Za-z0-9\-_]/', '', $raw['coupon_prefix'] ) ) : '';
+		if ( oli_acr_is_default_consent_text( $new['consent_text'] ) ) {
+			// Texte par défaut : on n'enregistre rien pour qu'il reste traduit dans la langue du visiteur.
+			$new['consent_text'] = '';
+		}
+		$new['roles_mode']      = isset( $raw['roles_mode'] ) && 'selected' === $raw['roles_mode'] ? 'selected' : 'all';
+		$new['roles']           = isset( $raw['roles'] ) ? array_values( array_intersect( array_map( 'sanitize_key', (array) $raw['roles'] ), array_keys( wp_roles()->get_names() ) ) ) : array();
+		$new['sender_name']     = isset( $raw['sender_name'] ) ? sanitize_text_field( $raw['sender_name'] ) : '';
+		$new['sender_email']    = isset( $raw['sender_email'] ) ? sanitize_email( $raw['sender_email'] ) : '';
+		$new['reply_to']        = isset( $raw['reply_to'] ) ? sanitize_email( $raw['reply_to'] ) : '';
+		$new['admin_recipient'] = isset( $raw['admin_recipient'] ) ? implode( ',', array_filter( array_map( 'sanitize_email', explode( ',', $raw['admin_recipient'] ) ) ) ) : '';
+		$new['coupon_prefix']   = isset( $raw['coupon_prefix'] ) ? strtoupper( preg_replace( '/[^A-Za-z0-9\-_]/', '', $raw['coupon_prefix'] ) ) : '';
 		update_option( 'oli_acr_settings', $new, false );
 
 		// Liste d'exclusion.
@@ -533,6 +567,8 @@ class OLI_ACR_Admin {
 
 	/**
 	 * Onglet modèles : liste, édition et test.
+	 *
+	 * @return void
 	 */
 	private static function render_templates() {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -573,6 +609,7 @@ class OLI_ACR_Admin {
 	 * Formulaire « Envoyer un test ».
 	 *
 	 * @param string $template_id Modèle présélectionné.
+	 * @return void
 	 */
 	private static function render_test_form( $template_id ) {
 		echo '<h2>' . esc_html__( 'Send a test', 'oli-abandoned-cart-recovery' ) . '</h2>';
@@ -590,7 +627,8 @@ class OLI_ACR_Admin {
 	/**
 	 * Formulaire d'édition d'un modèle.
 	 *
-	 * @param array|null $tpl Modèle.
+	 * @param array<string, mixed>|null $tpl Modèle.
+	 * @return void
 	 */
 	private static function render_template_form( $tpl ) {
 		$tpl = $tpl ? $tpl : OLI_ACR_Templates::blank();
@@ -638,6 +676,8 @@ class OLI_ACR_Admin {
 
 	/**
 	 * Enregistre un modèle.
+	 *
+	 * @return void
 	 */
 	public static function save_template() {
 		self::check_cap();
@@ -649,6 +689,8 @@ class OLI_ACR_Admin {
 
 	/**
 	 * Supprime un modèle.
+	 *
+	 * @return void
 	 */
 	public static function delete_template() {
 		self::check_cap();
@@ -660,6 +702,8 @@ class OLI_ACR_Admin {
 
 	/**
 	 * Bouton « Envoyer un test ».
+	 *
+	 * @return void
 	 */
 	public static function test_email() {
 		self::check_cap();
@@ -673,12 +717,15 @@ class OLI_ACR_Admin {
 
 	/**
 	 * Actions sur un panier : envoi immédiat ou suppression.
+	 *
+	 * @return void
 	 */
 	public static function cart_action() {
 		self::check_cap();
-		check_admin_referer( 'oli_acr_cart_action' );
-		$id   = isset( $_GET['cart'] ) ? absint( $_GET['cart'] ) : 0;
-		$do   = isset( $_GET['do'] ) ? sanitize_key( $_GET['do'] ) : '';
+		$id = isset( $_GET['cart'] ) ? absint( $_GET['cart'] ) : 0;
+		$do = isset( $_GET['do'] ) ? sanitize_key( $_GET['do'] ) : '';
+		// Nonce lié à l'action et au panier.
+		check_admin_referer( 'oli_acr_cart_action_' . $do . '_' . $id );
 		$cart = OLI_ACR_Carts::get( $id );
 		if ( ! $cart ) {
 			self::redirect( 'carts', 'not_sent' );
@@ -687,28 +734,42 @@ class OLI_ACR_Admin {
 			OLI_ACR_Carts::delete( $id );
 			self::redirect( 'carts', 'deleted' );
 		}
-		$done = array_filter( explode( ',', (string) $cart->sent_templates ) );
-		foreach ( OLI_ACR_Templates::active( 'cart' ) as $tpl_id => $tpl ) {
-			if ( in_array( $tpl_id, $done, true ) ) {
-				continue;
-			}
-			if ( empty( $cart->abandoned_at ) ) {
-				OLI_ACR_Carts::update( $id, array( 'abandoned_at' => oli_acr_now() ) );
-			}
-			$ok = OLI_ACR_Mailer::send_cart_email( $cart, $tpl_id, $tpl );
-			self::redirect( 'carts', $ok ? 'sent' : 'not_sent' );
+		// Seuls les paniers encore actifs peuvent être relancés (pas récupérés, désabonnés ni terminés).
+		if ( 'send' !== $do || ! in_array( $cart->status, OLI_ACR_Carts::LIVE_STATUSES, true ) || oli_acr_is_unsubscribed( $cart->email ) || (int) $cart->order_id > 0 ) {
+			self::redirect( 'carts', 'not_sent' );
 		}
-		self::redirect( 'carts', 'not_sent' );
+		$templates = OLI_ACR_Templates::active( 'cart' );
+		$done      = array_filter( explode( ',', (string) $cart->sent_templates ) );
+		$next      = OLI_ACR_Scheduler::next_template( $templates, $done );
+		if ( ! $next ) {
+			self::redirect( 'carts', 'not_sent' );
+		}
+		if ( empty( $cart->abandoned_at ) ) {
+			$cart->abandoned_at = oli_acr_now();
+			OLI_ACR_Carts::update( $id, array( 'abandoned_at' => $cart->abandoned_at ) );
+		}
+		$ok = OLI_ACR_Mailer::send_cart_email( $cart, $next['id'], $next );
+		if ( $ok ) {
+			// La suite de la séquence continue automatiquement.
+			$done[]    = $next['id'];
+			$following = OLI_ACR_Scheduler::next_template( $templates, $done );
+			$base      = (int) strtotime( $cart->abandoned_at . ' UTC' );
+			OLI_ACR_Carts::update( $id, array( 'next_send_at' => $following ? gmdate( 'Y-m-d H:i:s', max( time() + 60, $base + oli_acr_duration_to_seconds( $following['delay'] ) ) ) : null ) );
+		}
+		self::redirect( 'carts', $ok ? 'sent' : 'not_sent' );
 	}
 
 	/**
 	 * Envoi immédiat d'une relance de commande en attente.
+	 *
+	 * @return void
 	 */
 	public static function order_action() {
 		self::check_cap();
-		check_admin_referer( 'oli_acr_order_action' );
-		$order = wc_get_order( isset( $_GET['order'] ) ? absint( $_GET['order'] ) : 0 );
-		if ( $order ) {
+		$order_id = isset( $_GET['order'] ) ? absint( $_GET['order'] ) : 0;
+		check_admin_referer( 'oli_acr_order_action_' . $order_id );
+		$order = wc_get_order( $order_id );
+		if ( $order instanceof WC_Order && $order->has_status( 'pending' ) && ! $order->get_meta( '_oli_acr_done' ) ) {
 			$done = array_filter( (array) $order->get_meta( '_oli_acr_sent' ) );
 			foreach ( OLI_ACR_Templates::active( 'order' ) as $tpl_id => $tpl ) {
 				if ( ! in_array( $tpl_id, $done, true ) ) {

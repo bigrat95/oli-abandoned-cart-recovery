@@ -3,6 +3,8 @@
  * Tableau d'admin (WP_List_Table) : journal des courriels.
  *
  * @package OliAbandonedCartRecovery
+ * @author  Olivier Bigras (bigrat95)
+ * @link    https://olivierbigras.com
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -32,7 +34,7 @@ class OLI_ACR_Log_Table extends WP_List_Table {
 	/**
 	 * Colonnes.
 	 *
-	 * @return array
+	 * @return array<mixed>
 	 */
 	public function get_columns() {
 		return array(
@@ -48,13 +50,15 @@ class OLI_ACR_Log_Table extends WP_List_Table {
 
 	/**
 	 * Prépare les lignes.
+	 *
+	 * @return void
 	 */
 	public function prepare_items() {
 		global $wpdb;
 		$table    = oli_acr_table( 'log' );
 		$per_page = 30;
 		$paged    = $this->get_pagenum();
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Noms de table fixes (oli_acr_table()), valeurs passées par prepare().
 		$total       = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" );
 		$this->items = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} ORDER BY id DESC LIMIT %d OFFSET %d", $per_page, ( $paged - 1 ) * $per_page ) );
 		// phpcs:enable
@@ -99,6 +103,8 @@ class OLI_ACR_Log_Table extends WP_List_Table {
 
 	/**
 	 * Message vide.
+	 *
+	 * @return void
 	 */
 	public function no_items() {
 		esc_html_e( 'No email sent yet.', 'oli-abandoned-cart-recovery' );

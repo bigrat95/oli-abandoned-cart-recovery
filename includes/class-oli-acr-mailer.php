@@ -3,6 +3,8 @@
  * Construction et envoi des courriels de relance, coupons uniques et journal.
  *
  * @package OliAbandonedCartRecovery
+ * @author  Olivier Bigras (bigrat95)
+ * @link    https://olivierbigras.com
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -15,12 +17,14 @@ class OLI_ACR_Mailer {
 	/**
 	 * Adresse de réponse et expéditeur temporaires pendant un envoi.
 	 *
-	 * @var array
+	 * @var array<mixed>
 	 */
 	private static $sending = array();
 
 	/**
 	 * Accroches.
+	 *
+	 * @return void
 	 */
 	public static function init() {
 		add_filter( 'woocommerce_email_classes', array( __CLASS__, 'register_emails' ) );
@@ -29,8 +33,8 @@ class OLI_ACR_Mailer {
 	/**
 	 * Ajoute le courriel d'avis à l'admin aux courriels WooCommerce.
 	 *
-	 * @param array $emails Courriels.
-	 * @return array
+	 * @param array<mixed> $emails Courriels.
+	 * @return array<mixed>
 	 */
 	public static function register_emails( $emails ) {
 		require_once OLI_ACR_DIR . 'includes/emails/class-oli-acr-email-admin-recovered.php';
@@ -41,7 +45,7 @@ class OLI_ACR_Mailer {
 	/**
 	 * Liste des balises disponibles.
 	 *
-	 * @return array
+	 * @return array<mixed>
 	 */
 	public static function placeholders() {
 		return array(
@@ -66,12 +70,26 @@ class OLI_ACR_Mailer {
 	/**
 	 * Envoie un modèle pour un panier abandonné.
 	 *
-	 * @param object $cart   Ligne de panier.
-	 * @param string $tpl_id ID du modèle.
-	 * @param array  $tpl    Modèle.
+	 * @param object       $cart   Ligne de panier.
+	 * @param string       $tpl_id ID du modèle.
+	 * @param array<mixed> $tpl    Modèle.
 	 * @return bool
 	 */
 	public static function send_cart_email( $cart, $tpl_id, $tpl ) {
+		// Envoi dans la langue enregistrée avec le panier (switch_to_locale / restore_previous_locale).
+		return (bool) oli_acr_in_locale( (string) $cart->language, array( __CLASS__, 'send_cart_email_now' ), $cart, $tpl_id, $tpl );
+	}
+
+	/**
+	 * Envoie un modèle pour un panier abandonné, dans la langue courante.
+	 *
+	 * @param object               $cart   Ligne de panier.
+	 * @param string               $tpl_id ID du modèle.
+	 * @param array<string, mixed> $tpl    Modèle.
+	 * @return bool
+	 */
+	public static function send_cart_email_now( $cart, $tpl_id, $tpl ) {
+		$tpl = OLI_ACR_Templates::localize( $tpl_id, $tpl );
 		if ( oli_acr_is_unsubscribed( $cart->email ) ) {
 			return false;
 		}
@@ -136,12 +154,43 @@ class OLI_ACR_Mailer {
 	/**
 	 * Envoie un modèle pour une commande en attente.
 	 *
-	 * @param WC_Order $order  Commande.
-	 * @param string   $tpl_id ID du modèle.
-	 * @param array    $tpl    Modèle.
+	 * @param WC_Order     $order  Commande.
+	 * @param string       $tpl_id ID du modèle.
+	 * @param array<mixed> $tpl    Modèle.
 	 * @return bool
 	 */
 	public static function send_order_email( $order, $tpl_id, $tpl ) {
+		return (bool) oli_acr_in_locale( self::order_language( $order ), array( __CLASS__, 'send_order_email_now' ), $order, $tpl_id, $tpl );
+	}
+
+	/**
+	 * Langue d'une commande : celle du panier lié, sinon celle du compte client, sinon celle du site.
+	 *
+	 * @param WC_Order $order Commande.
+	 * @return string
+	 */
+	public static function order_language( $order ) {
+		$cart_id = absint( $order->get_meta( '_oli_acr_cart_id' ) );
+		$cart    = $cart_id ? OLI_ACR_Carts::get( $cart_id ) : null;
+		if ( $cart && '' !== (string) $cart->language ) {
+			return (string) $cart->language;
+		}
+		if ( $order->get_customer_id() ) {
+			return get_user_locale( $order->get_customer_id() );
+		}
+		return get_locale();
+	}
+
+	/**
+	 * Envoie un modèle pour une commande en attente, dans la langue courante.
+	 *
+	 * @param WC_Order             $order  Commande.
+	 * @param string               $tpl_id ID du modèle.
+	 * @param array<string, mixed> $tpl    Modèle.
+	 * @return bool
+	 */
+	public static function send_order_email_now( $order, $tpl_id, $tpl ) {
+		$tpl   = OLI_ACR_Templates::localize( $tpl_id, $tpl );
 		$email = strtolower( $order->get_billing_email() );
 		if ( ! is_email( $email ) || oli_acr_is_unsubscribed( $email ) ) {
 			return false;
@@ -157,6 +206,11 @@ class OLI_ACR_Mailer {
 		);
 		$items  = array();
 		foreach ( $order->get_items() as $item ) {
+			/**
+			 * Articles de type line_item (valeur par défaut de get_items()).
+			 *
+			 * @var WC_Order_Item_Product $item
+			 */
 			$items[] = array(
 				'product_id'   => (int) $item->get_product_id(),
 				'variation_id' => (int) $item->get_variation_id(),
@@ -194,11 +248,14 @@ class OLI_ACR_Mailer {
 	/**
 	 * Envoie un courriel de test à partir d'un modèle.
 	 *
-	 * @param string $to  Destinataire.
-	 * @param array  $tpl Modèle.
+	 * @param string       $to  Destinataire.
+	 * @param array<mixed> $tpl Modèle.
 	 * @return bool
 	 */
 	public static function send_test( $to, $tpl ) {
+		if ( ! empty( $tpl['id'] ) ) {
+			$tpl = OLI_ACR_Templates::localize( (string) $tpl['id'], $tpl );
+		}
 		$items    = array();
 		$products = wc_get_products(
 			array(
@@ -229,6 +286,7 @@ class OLI_ACR_Mailer {
 			'coupon'       => 'yes' === $tpl['coupon_enabled'] ? 'TEST-COUPON' : '',
 			'order_number' => '1234',
 			'order_date'   => wc_format_datetime( new WC_DateTime() ),
+			'test'         => true,
 		);
 		/* translators: %s: email subject. */
 		$tpl['subject'] = sprintf( __( '[Test] %s', 'oli-abandoned-cart-recovery' ), $tpl['subject'] );
@@ -238,8 +296,8 @@ class OLI_ACR_Mailer {
 	/**
 	 * Remplace les balises et envoie.
 	 *
-	 * @param array $tpl     Modèle.
-	 * @param array $context Contexte.
+	 * @param array<mixed> $tpl     Modèle.
+	 * @param array<mixed> $context Contexte.
 	 * @return bool
 	 */
 	public static function deliver_template( $tpl, $context ) {
@@ -256,10 +314,12 @@ class OLI_ACR_Mailer {
 				'coupon'       => '',
 				'order_number' => '',
 				'order_date'   => '',
+				'test'         => false,
 			)
 		);
 
-		$unsub      = oli_acr_unsubscribe_url( $context['email'] );
+		// Courriel test : lien de désabonnement factice, sans effet (aucune adresse n'est exclue).
+		$unsub      = $context['test'] ? '#' : oli_acr_unsubscribe_url( $context['email'] );
 		$first_name = '' !== $context['first_name'] ? $context['first_name'] : __( 'there', 'oli-abandoned-cart-recovery' );
 		$price_args = array( 'currency' => $context['currency'] );
 		$button     = '' !== $tpl['button_label'] ? $tpl['button_label'] : __( 'Complete my order', 'oli-abandoned-cart-recovery' );
@@ -306,7 +366,7 @@ class OLI_ACR_Mailer {
 		) . '</p>';
 
 		$reply_to = '' !== $tpl['reply_to'] ? $tpl['reply_to'] : oli_acr_get_setting( 'reply_to' );
-		return self::deliver( $context['email'], $subject, $heading, $body, $reply_to, $unsub );
+		return self::deliver( $context['email'], $subject, $heading, $body, $reply_to, $context['test'] ? '' : $unsub );
 	}
 
 	/**
@@ -342,7 +402,9 @@ class OLI_ACR_Mailer {
 			$headers[] = 'Reply-To: ' . $reply_to;
 		}
 		if ( $unsub ) {
+			// RFC 8058 : désabonnement en un clic (POST sans confirmation sur la même URL signée).
 			$headers[] = 'List-Unsubscribe: <' . esc_url_raw( $unsub ) . '>';
+			$headers[] = 'List-Unsubscribe-Post: List-Unsubscribe=One-Click';
 		}
 
 		self::$sending = array(
@@ -383,32 +445,38 @@ class OLI_ACR_Mailer {
 	/**
 	 * Tableau HTML des articles.
 	 *
-	 * @param array  $items    Articles.
-	 * @param float  $total    Total.
-	 * @param string $currency Devise.
+	 * @param array<mixed> $items    Articles.
+	 * @param float        $total    Total.
+	 * @param string       $currency Devise.
 	 * @return string
 	 */
 	public static function items_table( $items, $total, $currency ) {
 		if ( empty( $items ) ) {
 			return '';
 		}
-		$args  = array( 'currency' => $currency );
-		$html  = '<table cellspacing="0" cellpadding="6" border="1" style="width:100%;border-collapse:collapse;border:1px solid #e5e5e5;margin:0 0 16px">';
-		$html .= '<thead><tr><th style="text-align:left" colspan="2">' . esc_html__( 'Product', 'oli-abandoned-cart-recovery' ) . '</th><th style="text-align:center">' . esc_html__( 'Quantity', 'oli-abandoned-cart-recovery' ) . '</th><th style="text-align:right">' . esc_html__( 'Total', 'oli-abandoned-cart-recovery' ) . '</th></tr></thead><tbody>';
+		$args = array( 'currency' => $currency );
+		$rows = array();
 		foreach ( $items as $item ) {
 			$product_id = ! empty( $item['variation_id'] ) ? $item['variation_id'] : $item['product_id'];
 			$product    = wc_get_product( $product_id );
 			$name       = $product ? $product->get_name() : ( isset( $item['name'] ) ? $item['name'] : '' );
 			$image      = '';
 			if ( $product && $product->get_image_id() ) {
-				$src = wp_get_attachment_image_url( $product->get_image_id(), 'woocommerce_gallery_thumbnail' );
+				$src = wp_get_attachment_image_url( (int) $product->get_image_id(), 'woocommerce_gallery_thumbnail' );
 				if ( $src ) {
 					$image = '<img src="' . esc_url( $src ) . '" width="48" height="48" alt="" style="display:block;border:0">';
 				}
 			}
-			$html .= '<tr><td style="width:56px">' . $image . '</td><td>' . esc_html( $name ) . '</td><td style="text-align:center">' . esc_html( (string) (int) $item['quantity'] ) . '</td><td style="text-align:right">' . wc_price( (float) $item['line_total'], $args ) . '</td></tr>';
+			$rows[] = array( $image, $name, (int) $item['quantity'], (float) $item['line_total'] );
 		}
-		$html .= '</tbody><tfoot><tr><th colspan="3" style="text-align:right">' . esc_html__( 'Total', 'oli-abandoned-cart-recovery' ) . '</th><td style="text-align:right"><strong>' . wc_price( (float) $total, $args ) . '</strong></td></tr></tfoot></table>';
+		// La colonne des images n'est affichée que si au moins un article a une image (sinon elle reste vide, surtout visible sur mobile).
+		$with_images = (bool) array_filter( wp_list_pluck( $rows, 0 ) );
+		$html        = '<table class="oli-acr-items" cellspacing="0" cellpadding="6" border="1" style="width:100%;border-collapse:collapse;border:1px solid #e5e5e5;margin:0 0 16px">';
+		$html       .= '<thead><tr><th style="text-align:left"' . ( $with_images ? ' colspan="2"' : '' ) . '>' . esc_html__( 'Product', 'oli-abandoned-cart-recovery' ) . '</th><th style="text-align:center">' . esc_html__( 'Quantity', 'oli-abandoned-cart-recovery' ) . '</th><th style="text-align:right">' . esc_html__( 'Total', 'oli-abandoned-cart-recovery' ) . '</th></tr></thead><tbody>';
+		foreach ( $rows as $row ) {
+			$html .= '<tr>' . ( $with_images ? '<td class="oli-acr-img" style="width:56px">' . $row[0] . '</td>' : '' ) . '<td>' . esc_html( $row[1] ) . '</td><td style="text-align:center">' . esc_html( (string) $row[2] ) . '</td><td style="text-align:right">' . wc_price( $row[3], $args ) . '</td></tr>';
+		}
+		$html .= '</tbody><tfoot><tr><th colspan="' . ( $with_images ? 3 : 2 ) . '" style="text-align:right">' . esc_html__( 'Total', 'oli-abandoned-cart-recovery' ) . '</th><td style="text-align:right"><strong>' . wc_price( (float) $total, $args ) . '</strong></td></tr></tfoot></table>';
 		return $html;
 	}
 
@@ -422,7 +490,8 @@ class OLI_ACR_Mailer {
 		if ( '' === (string) $code ) {
 			return '';
 		}
-		return '<p style="text-align:center;margin:20px 0"><span style="display:inline-block;border:2px dashed #7f54b3;padding:10px 20px;font-size:20px;font-weight:bold;letter-spacing:2px">' . esc_html( $code ) . '</span></p>';
+		$color = get_option( 'woocommerce_email_base_color', '#7f54b3' );
+		return '<p style="text-align:center;margin:20px 0"><span class="oli-acr-coupon" style="display:inline-block;border:2px dashed ' . esc_attr( $color ) . ';padding:10px 20px;font-size:20px;font-weight:bold;letter-spacing:2px">' . esc_html( $code ) . '</span></p>';
 	}
 
 	/**
@@ -440,9 +509,9 @@ class OLI_ACR_Mailer {
 	/**
 	 * Crée un coupon unique pour une relance si le modèle le demande.
 	 *
-	 * @param array  $tpl    Modèle.
-	 * @param string $email  Courriel du client (restriction).
-	 * @param int    $log_id Journal.
+	 * @param array<mixed> $tpl    Modèle.
+	 * @param string       $email  Courriel du client (restriction).
+	 * @param int          $log_id Journal.
 	 * @return string Code ou chaîne vide.
 	 */
 	public static function maybe_create_coupon( $tpl, $email, $log_id ) {
@@ -512,6 +581,7 @@ class OLI_ACR_Mailer {
 	 * Supprime une ligne de journal (envoi échoué).
 	 *
 	 * @param int $log_id ID.
+	 * @return void
 	 */
 	public static function delete_log( $log_id ) {
 		global $wpdb;
@@ -528,7 +598,7 @@ class OLI_ACR_Mailer {
 	public static function get_log( $log_id ) {
 		global $wpdb;
 		$table = oli_acr_table( 'log' );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table() ou $wpdb->prefix avec un suffixe fixe, jamais une saisie.
 		return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $log_id ) );
 	}
 }

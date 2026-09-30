@@ -3,6 +3,8 @@
  * Capture du courriel et du panier au checkout (classique et en blocs).
  *
  * @package OliAbandonedCartRecovery
+ * @author  Olivier Bigras (bigrat95)
+ * @link    https://olivierbigras.com
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -21,6 +23,8 @@ class OLI_ACR_Capture {
 
 	/**
 	 * Accroches.
+	 *
+	 * @return void
 	 */
 	public static function init() {
 		if ( 'yes' !== oli_acr_get_setting( 'enabled' ) ) {
@@ -38,6 +42,8 @@ class OLI_ACR_Capture {
 
 	/**
 	 * Charge le script de capture sur la page de paiement seulement.
+	 *
+	 * @return void
 	 */
 	public static function enqueue() {
 		if ( ! function_exists( 'is_checkout' ) || ! is_checkout() || is_wc_endpoint_url( 'order-received' ) || is_wc_endpoint_url( 'order-pay' ) ) {
@@ -62,8 +68,8 @@ class OLI_ACR_Capture {
 	/**
 	 * Case de consentement au checkout classique.
 	 *
-	 * @param array $fields Champs.
-	 * @return array
+	 * @param array<mixed> $fields Champs.
+	 * @return array<mixed>
 	 */
 	public static function classic_consent_field( $fields ) {
 		if ( is_user_logged_in() ) {
@@ -81,6 +87,8 @@ class OLI_ACR_Capture {
 
 	/**
 	 * Case de consentement au checkout en blocs (API des champs additionnels).
+	 *
+	 * @return void
 	 */
 	public static function blocks_consent_field() {
 		if ( ! function_exists( 'woocommerce_register_additional_checkout_field' ) ) {
@@ -99,14 +107,11 @@ class OLI_ACR_Capture {
 
 	/**
 	 * Point d'entrée AJAX (wc-ajax) appelé sur blur/change du champ courriel ou téléphone.
+	 *
+	 * @return void
 	 */
 	public static function ajax_capture() {
 		check_ajax_referer( 'oli_acr_capture', 'nonce' );
-
-		$email = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
-		if ( ! is_email( $email ) ) {
-			wp_send_json_error( array( 'reason' => 'invalid_email' ), 400 );
-		}
 
 		$user_id = get_current_user_id();
 		$mode    = oli_acr_get_setting( 'guest_tracking' );
@@ -115,6 +120,7 @@ class OLI_ACR_Capture {
 			wp_send_json_error( array( 'reason' => 'not_tracked' ) );
 		}
 
+		// Loi 25 : sans consentement explicite, rien n'est enregistré (ni courriel, ni téléphone, ni panier).
 		$consent = isset( $_POST['consent'] ) ? '1' === sanitize_text_field( wp_unslash( $_POST['consent'] ) ) : false;
 		if ( ! $user_id && 'consent' === $mode && ! $consent ) {
 			// Consentement retiré : on oublie le panier de cette session.
@@ -126,6 +132,11 @@ class OLI_ACR_Capture {
 				WC()->session->set( OLI_ACR_Carts::SESSION_KEY, null );
 			}
 			wp_send_json_error( array( 'reason' => 'no_consent' ) );
+		}
+
+		$email = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
+		if ( ! is_email( $email ) ) {
+			wp_send_json_error( array( 'reason' => 'invalid_email' ), 400 );
 		}
 
 		if ( oli_acr_is_unsubscribed( $email ) ) {
@@ -157,6 +168,8 @@ class OLI_ACR_Capture {
 
 	/**
 	 * Met à jour le panier suivi quand son contenu change (connectés et invités déjà capturés).
+	 *
+	 * @return void
 	 */
 	public static function cart_updated() {
 		if ( self::$busy || ! WC()->session || ! WC()->cart || wp_doing_cron() ) {
