@@ -1,0 +1,148 @@
+<?php
+/**
+ * Installation : tables, capacités, réglages et modèles par défaut.
+ *
+ * @package OliAbandonedCartRecovery
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Classe d'installation.
+ */
+class OLI_ACR_Install {
+
+	/**
+	 * Activation du plugin.
+	 */
+	public static function activate() {
+		self::create_tables();
+		self::add_caps();
+		if ( false === get_option( 'oli_acr_settings' ) ) {
+			add_option( 'oli_acr_settings', oli_acr_default_settings(), '', false );
+		}
+		if ( false === get_option( 'oli_acr_templates' ) ) {
+			add_option( 'oli_acr_templates', OLI_ACR_Templates::default_templates(), '', false );
+		}
+		if ( false === get_option( 'oli_acr_blocklist' ) ) {
+			add_option( 'oli_acr_blocklist', array(), '', false );
+		}
+		// La planification est (re)créée au prochain chargement.
+		delete_option( 'oli_acr_schedule_signature' );
+	}
+
+	/**
+	 * Désactivation : on retire les tâches planifiées, on garde les données.
+	 */
+	public static function deactivate() {
+		OLI_ACR_Scheduler::unschedule_all();
+		delete_option( 'oli_acr_schedule_signature' );
+	}
+
+	/**
+	 * Mise à jour du schéma si la version a changé.
+	 */
+	public static function maybe_upgrade() {
+		if ( get_option( 'oli_acr_db_version' ) !== OLI_ACR_DB_VERSION ) {
+			self::create_tables();
+			self::add_caps();
+		}
+	}
+
+	/**
+	 * Crée ou met à jour les tables avec dbDelta.
+	 */
+	public static function create_tables() {
+		global $wpdb;
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+		$collate = $wpdb->get_charset_collate();
+		$carts   = oli_acr_table( 'carts' );
+		$log     = oli_acr_table( 'log' );
+
+		$sql = "CREATE TABLE {$carts} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  token char(32) NOT NULL,
+  session_key varchar(100) NOT NULL DEFAULT '',
+  user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+  email varchar(190) NOT NULL DEFAULT '',
+  phone varchar(40) NOT NULL DEFAULT '',
+  first_name varchar(100) NOT NULL DEFAULT '',
+  last_name varchar(100) NOT NULL DEFAULT '',
+  cart_contents longtext NULL,
+  cart_hash char(32) NOT NULL DEFAULT '',
+  item_count int(11) unsigned NOT NULL DEFAULT 0,
+  cart_total decimal(19,4) NOT NULL DEFAULT 0,
+  currency varchar(10) NOT NULL DEFAULT '',
+  language varchar(20) NOT NULL DEFAULT '',
+  status varchar(20) NOT NULL DEFAULT 'open',
+  consent tinyint(1) NOT NULL DEFAULT 0,
+  emails_sent smallint(5) unsigned NOT NULL DEFAULT 0,
+  sent_templates varchar(255) NOT NULL DEFAULT '',
+  next_send_at datetime NULL DEFAULT NULL,
+  last_email_at datetime NULL DEFAULT NULL,
+  clicked_at datetime NULL DEFAULT NULL,
+  order_id bigint(20) unsigned NOT NULL DEFAULT 0,
+  recovered_via varchar(20) NOT NULL DEFAULT '',
+  recovered_total decimal(19,4) NOT NULL DEFAULT 0,
+  recovered_at datetime NULL DEFAULT NULL,
+  abandoned_at datetime NULL DEFAULT NULL,
+  created_at datetime NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY  (id),
+  UNIQUE KEY token (token),
+  KEY session_key (session_key),
+  KEY email (email),
+  KEY user_id (user_id),
+  KEY status_updated (status,updated_at),
+  KEY status_next (status,next_send_at)
+) {$collate};
+CREATE TABLE {$log} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  object_type varchar(10) NOT NULL DEFAULT 'cart',
+  object_id bigint(20) unsigned NOT NULL DEFAULT 0,
+  template_id varchar(40) NOT NULL DEFAULT '',
+  email varchar(190) NOT NULL DEFAULT '',
+  coupon_code varchar(100) NOT NULL DEFAULT '',
+  sent_at datetime NOT NULL,
+  clicked_at datetime NULL DEFAULT NULL,
+  recovered_at datetime NULL DEFAULT NULL,
+  recovered_total decimal(19,4) NOT NULL DEFAULT 0,
+  order_id bigint(20) unsigned NOT NULL DEFAULT 0,
+  PRIMARY KEY  (id),
+  KEY object (object_type,object_id),
+  KEY template_id (template_id),
+  KEY email (email),
+  KEY sent_at (sent_at)
+) {$collate};";
+
+		dbDelta( $sql );
+		update_option( 'oli_acr_db_version', OLI_ACR_DB_VERSION, false );
+	}
+
+	/**
+	 * Ajoute la capacité dédiée aux administrateurs (et au shop_manager si permis).
+	 */
+	public static function add_caps() {
+		$admin = get_role( 'administrator' );
+		if ( $admin ) {
+			$admin->add_cap( OLI_ACR_CAP );
+		}
+		self::sync_shop_manager_cap();
+	}
+
+	/**
+	 * Synchronise la capacité du rôle shop_manager avec le réglage.
+	 */
+	public static function sync_shop_manager_cap() {
+		$role = get_role( 'shop_manager' );
+		if ( ! $role ) {
+			return;
+		}
+		if ( 'yes' === oli_acr_get_setting( 'shop_manager_access' ) ) {
+			$role->add_cap( OLI_ACR_CAP );
+		} else {
+			$role->remove_cap( OLI_ACR_CAP );
+		}
+	}
+}
