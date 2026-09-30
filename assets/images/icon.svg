@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>Abandoned cart recovery icon</title>
+  <rect x="8" y="8" width="240" height="240" rx="30" fill="#262626"/>
+  <!-- return / recover ring -->
+  <path d="M43.43 97.22 A90 90 0 1 0 85.75 48.53" fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="butt"/>
+  <path d="M96.55 68.84 L57.49 63.56 L74.95 28.23 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round"/>
+  <!-- cart -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M80 92 H94 L108 148 H168 L182 106 H99"/>
+  </g>
+  <circle cx="115" cy="171" r="10" fill="#FFFFFF"/>
+  <circle cx="161" cy="171" r="10" fill="#FFFFFF"/>
+</svg>
