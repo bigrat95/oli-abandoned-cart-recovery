@@ -1,0 +1,11 @@
+# Exclut les fichiers de développement des zips GitHub (Code > Download ZIP)
+.git export-ignore
+.gitignore export-ignore
+.gitattributes export-ignore
+.github export-ignore
+.wordpress-org export-ignore
+.phpcs.xml.dist export-ignore
+README.md export-ignore
+tests export-ignore
+tools export-ignore
+composer.json export-ignore

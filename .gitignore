@@ -1,0 +1,11 @@
+node_modules/
+vendor/
+.DS_Store
+Thumbs.db
+*.log
+*Zone.Identifier
+.idea/
+.vscode/
+composer.lock
+tests/e2e-results-*.json
+!tests/e2e-run-*.log
