@@ -2,7 +2,7 @@
 const { chromium } = require('playwright-core');
 const B = 'http://localhost:8888';
 const MP = 'http://127.0.0.1:8025';
-const OUT = process.argv[2] || '/workspace/abandoned-cart-plugin/screenshots';
+const OUT = process.argv[2] || require('path').join(process.cwd(), 'screenshots');
 
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.HOME + '/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome' });

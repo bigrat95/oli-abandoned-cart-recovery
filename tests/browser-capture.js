@@ -1,7 +1,7 @@
 // Test navigateur sans tête : capture du courriel au checkout classique et en blocs.
 const { chromium } = require('playwright-core');
-const B = 'http://localhost:8888';
-const SHOTS = '/workspace/abandoned-cart-plugin/screenshots';
+const B = process.env.OLI_ACR_E2E_URL || 'http://localhost:8888';
+const SHOTS = process.env.OLI_ACR_E2E_SHOTS || require('os').tmpdir();
 const mode = process.argv[2] || 'both'; // classic | blocks | both
 const suffix = process.argv[3] || '';
 
