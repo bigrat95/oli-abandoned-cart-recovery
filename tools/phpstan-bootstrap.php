@@ -7,7 +7,7 @@
  * @link    https://olivierbigras.com
  */
 
-define( 'OLI_ACR_VERSION', '1.0.1' );
+define( 'OLI_ACR_VERSION', '1.1.0' );
 define( 'OLI_ACR_DB_VERSION', '1.0.0' );
 define( 'OLI_ACR_FILE', __DIR__ . '/../oli-abandoned-cart-recovery.php' );
 define( 'OLI_ACR_DIR', __DIR__ . '/../' );

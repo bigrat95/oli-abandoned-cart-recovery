@@ -91,8 +91,7 @@ class OLI_ACR_Log_Table extends WP_List_Table {
 			case 'email':
 				return esc_html( $item->email );
 			case 'template_id':
-				$tpl = OLI_ACR_Templates::get( $item->template_id );
-				return esc_html( $tpl ? $tpl['name'] : $item->template_id );
+				return esc_html( OLI_ACR_Admin::template_name( (string) $item->template_id ) );
 			case 'object_type':
 				return 'order' === $item->object_type ? esc_html__( 'Pending order', 'oli-abandoned-cart-recovery' ) : esc_html__( 'Abandoned cart', 'oli-abandoned-cart-recovery' );
 			case 'coupon_code':

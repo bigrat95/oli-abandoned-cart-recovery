@@ -24,6 +24,9 @@ function oli_acr_default_settings() {
 		// Loi 25 (Québec) et RGPD : rien n'est capté pour un visiteur sans son consentement explicite.
 		'guest_tracking'        => 'consent',
 		'consent_text'          => '',
+		// Textes de consentement par langue (locale => texte) et langue de repli (vide = langue par défaut du site).
+		'consent_texts'         => array(),
+		'fallback_language'     => '',
 		'roles_mode'            => 'all',
 		'roles'                 => array(),
 		'pending_enabled'       => 'no',
@@ -91,19 +94,100 @@ function oli_acr_default_consent_text() {
 }
 
 /**
- * Texte de consentement (réglage personnalisé, sinon texte par défaut traduit dans la langue courante).
+ * Texte de consentement personnalisé de la langue de repli (vide = texte par défaut).
  *
- * Un texte enregistré identique au texte par défaut d'une des langues installées est traité comme
- * le texte par défaut : il suit alors la langue du visiteur.
- *
+ * @param string|null $fallback Langue de repli.
  * @return string
  */
-function oli_acr_consent_text() {
-	$text = (string) oli_acr_get_setting( 'consent_text' );
-	if ( '' === trim( $text ) || oli_acr_is_default_consent_text( $text ) ) {
-		return oli_acr_default_consent_text();
+function oli_acr_consent_base_text( $fallback = null ) {
+	$fallback = null === $fallback ? OLI_ACR_Lang::fallback_language() : $fallback;
+	$texts    = (array) oli_acr_get_setting( 'consent_texts' );
+	$text     = isset( $texts[ $fallback ] ) ? (string) $texts[ $fallback ] : '';
+	if ( '' === trim( $text ) ) {
+		// Réglage de la 1.0.x (une seule langue).
+		$text = (string) oli_acr_get_setting( 'consent_text' );
 	}
-	return $text;
+	return ( '' === trim( $text ) || oli_acr_is_default_consent_text( $text ) ) ? '' : $text;
+}
+
+/**
+ * Texte de consentement dans une langue, dans cet ordre de priorité :
+ * texte saisi pour cette langue, traduction WPML / Polylang du texte de repli, texte par défaut
+ * traduit (si le texte de repli n'est pas personnalisé), puis texte de repli.
+ *
+ * @param string $locale Langue (vide = langue de la requête).
+ * @return string
+ */
+function oli_acr_consent_text( $locale = '' ) {
+	$locale   = '' !== $locale ? OLI_ACR_Lang::resolve( $locale ) : OLI_ACR_Lang::current_language();
+	$fallback = OLI_ACR_Lang::fallback_language();
+	$texts    = (array) oli_acr_get_setting( 'consent_texts' );
+	$own      = isset( $texts[ $locale ] ) ? trim( (string) $texts[ $locale ] ) : '';
+	if ( '' !== $own && ! oli_acr_is_default_consent_text( $own ) ) {
+		return $own;
+	}
+	$base = oli_acr_consent_base_text( $fallback );
+	if ( '' === $base ) {
+		return oli_acr_in_locale( $locale, 'oli_acr_default_consent_text' );
+	}
+	if ( $locale !== $fallback ) {
+		$translated = OLI_ACR_Lang::adapter()->translate_string( OLI_ACR_Lang::string_name( 'consent_text' ), $base, $locale );
+		if ( null !== $translated ) {
+			return $translated;
+		}
+	}
+	return $base;
+}
+
+/**
+ * Balises permises dans le texte de consentement : liens (href, target, rel), gras et italique.
+ *
+ * @return array<string, array<string, bool>>
+ */
+function oli_acr_consent_allowed_html() {
+	return array(
+		'a'      => array(
+			'href'   => true,
+			'target' => true,
+			'rel'    => true,
+		),
+		'strong' => array(),
+		'em'     => array(),
+	);
+}
+
+/**
+ * Nettoie un texte de consentement saisi (éditeur) : liens, gras et italique seulement, sur une ligne.
+ *
+ * @param string $text Texte.
+ * @return string
+ */
+function oli_acr_sanitize_consent_html( $text ) {
+	$text = str_replace( array( '<b>', '</b>', '<i>', '</i>' ), array( '<strong>', '</strong>', '<em>', '</em>' ), (string) $text );
+	$text = (string) preg_replace( '#</p>\s*<p[^>]*>|<br\s*/?>#i', ' ', $text );
+	$text = (string) preg_replace( '#<(script|style)\b[^>]*>.*?</\1>#is', '', $text );
+	$text = wp_kses( $text, oli_acr_consent_allowed_html(), array( 'http', 'https', 'mailto' ) );
+	// Lien sans adresse web valable (ex. « javascript: » retiré par wp_kses) : on garde seulement le texte.
+	$text = (string) preg_replace_callback(
+		'#<a\b([^>]*)>(.*?)</a>#is',
+		static function ( $m ) {
+			return preg_match( '#\bhref=(["\'])(https?://|mailto:|/|\#)#i', $m[1] ) ? $m[0] : $m[2];
+		},
+		$text
+	);
+	// Lien qui ouvre un nouvel onglet : rel="noopener" s'il n'est pas précisé.
+	$text = (string) preg_replace( '#<a\b(?![^>]*\brel=)([^>]*\btarget=(["\'])_blank\2[^>]*)>#i', '<a$1 rel="noopener noreferrer">', $text );
+	return trim( (string) preg_replace( '/\s+/u', ' ', $text ) );
+}
+
+/**
+ * Texte de consentement prêt à afficher (HTML permis seulement).
+ *
+ * @param string $locale Langue (vide = langue de la requête).
+ * @return string
+ */
+function oli_acr_consent_html( $locale = '' ) {
+	return wp_kses( oli_acr_consent_text( $locale ), oli_acr_consent_allowed_html(), array( 'http', 'https', 'mailto' ) );
 }
 
 /**
@@ -131,6 +215,7 @@ function oli_acr_is_default_consent_text( $text ) {
  */
 function oli_acr_normalize_text( $text ) {
 	$text = str_replace( array( '<br />', '<br/>' ), '<br>', (string) $text );
+	$text = (string) preg_replace( '#</?p\b[^>]*>#i', '', $text );
 	return (string) preg_replace( '/\s+/u', '', $text );
 }
 
@@ -202,6 +287,39 @@ function oli_acr_duration_units() {
 }
 
 /**
+ * Durée lisible, au singulier ou au pluriel selon la valeur (« 1 hour », « 2 hours », « 1 heure »).
+ *
+ * @param array<mixed> $duration Durée (value, unit).
+ * @return string
+ */
+function oli_acr_duration_label( $duration ) {
+	$value = is_array( $duration ) && isset( $duration['value'] ) ? absint( $duration['value'] ) : absint( $duration );
+	$unit  = is_array( $duration ) && isset( $duration['unit'] ) ? (string) $duration['unit'] : 'minutes';
+	switch ( $unit ) {
+		case 'days':
+			/* translators: %d: number of days. */
+			return sprintf( _n( '%d day', '%d days', $value, 'oli-abandoned-cart-recovery' ), $value );
+		case 'hours':
+			/* translators: %d: number of hours. */
+			return sprintf( _n( '%d hour', '%d hours', $value, 'oli-abandoned-cart-recovery' ), $value );
+		default:
+			/* translators: %d: number of minutes. */
+			return sprintf( _n( '%d minute', '%d minutes', $value, 'oli-abandoned-cart-recovery' ), $value );
+	}
+}
+
+/**
+ * Date et heure dans le format et le fuseau du site (Réglages > Général), traduites.
+ *
+ * @param int $timestamp Horodatage Unix (UTC).
+ * @return string
+ */
+function oli_acr_format_datetime( $timestamp ) {
+	$format = trim( get_option( 'date_format', 'Y-m-d' ) . ' ' . get_option( 'time_format', 'H:i' ) );
+	return date_i18n( '' !== $format ? $format : 'Y-m-d H:i', (int) $timestamp + (int) round( (float) get_option( 'gmt_offset' ) * HOUR_IN_SECONDS ) );
+}
+
+/**
  * Convertit une durée (valeur + unité) en secondes.
  *
  * @param array<mixed>|int $duration Durée.
@@ -265,6 +383,7 @@ function oli_acr_statuses() {
 		'reminded'     => _x( 'Reminded', 'cart status', 'oli-abandoned-cart-recovery' ),
 		'recovered'    => _x( 'Recovered', 'cart status', 'oli-abandoned-cart-recovery' ),
 		'unsubscribed' => _x( 'Unsubscribed', 'cart status', 'oli-abandoned-cart-recovery' ),
+		'failed'       => _x( 'Send failed', 'cart status', 'oli-abandoned-cart-recovery' ),
 	);
 }
 
@@ -329,18 +448,21 @@ function oli_acr_email_signature( $email ) {
 }
 
 /**
- * URL de désabonnement signée.
+ * URL de désabonnement signée, dans la langue du destinataire.
  *
- * @param string $email Courriel.
+ * @param string $email  Courriel.
+ * @param string $locale Langue (vide = langue de repli).
  * @return string
  */
-function oli_acr_unsubscribe_url( $email ) {
+function oli_acr_unsubscribe_url( $email, $locale = '' ) {
+	$locale = OLI_ACR_Lang::resolve( $locale );
 	return add_query_arg(
 		array(
 			'oli_acr_unsub' => rawurlencode( $email ),
 			'oli_acr_sig'   => oli_acr_email_signature( $email ),
+			'oli_acr_lang'  => $locale,
 		),
-		home_url( '/' )
+		OLI_ACR_Lang::home_url( $locale )
 	);
 }
 
@@ -366,21 +488,12 @@ function oli_acr_user_is_tracked( $user_id ) {
 }
 
 /**
- * Langue courante du visiteur (compatible WPML / Polylang / TranslatePress).
+ * Langue courante du visiteur, en locale (WPML, Polylang, TranslatePress, Weglot ou cœur).
  *
  * @return string
  */
 function oli_acr_current_language() {
-	if ( defined( 'ICL_LANGUAGE_CODE' ) ) {
-		return (string) ICL_LANGUAGE_CODE;
-	}
-	if ( function_exists( 'pll_current_language' ) ) {
-		$lang = pll_current_language();
-		if ( $lang ) {
-			return (string) $lang;
-		}
-	}
-	return determine_locale();
+	return OLI_ACR_Lang::current_language();
 }
 
 /**
@@ -403,6 +516,79 @@ function oli_acr_log( $message, $level = 'info' ) {
 }
 
 /**
+ * Interrupteur du consentement (activé par défaut) : invités et clients connectés doivent cocher la case.
+ *
+ * @return bool
+ */
+function oli_acr_consent_required() {
+	return 'always' !== oli_acr_get_setting( 'guest_tracking' );
+}
+
+/**
+ * Le client connecté a-t-il déjà consenti (case cochée, mémorisée dans sa fiche) ?
+ *
+ * @param int $user_id Utilisateur.
+ * @return bool
+ */
+function oli_acr_user_has_consent( $user_id ) {
+	return $user_id > 0 && (bool) get_user_meta( (int) $user_id, OLI_ACR_Carts::USER_CONSENT_META, true );
+}
+
+/**
+ * Journalise une erreur dans les journaux WooCommerce, même sans WP_DEBUG (WooCommerce > État > Journaux).
+ *
+ * @param string $message Message.
+ * @return void
+ */
+function oli_acr_log_error( $message ) {
+	/**
+	 * Active la journalisation des erreurs d'envoi (activée par défaut, même sans WP_DEBUG).
+	 *
+	 * @param bool $enabled Actif ou non.
+	 */
+	if ( ! apply_filters( 'oli_acr_log_errors', true ) || ! function_exists( 'wc_get_logger' ) ) {
+		return;
+	}
+	wc_get_logger()->error( $message, array( 'source' => 'oli-abandoned-cart-recovery' ) );
+}
+
+/**
+ * Mémorise le dernier échec d'envoi pour l'avis de l'administration (jusqu'à ce qu'il soit fermé).
+ *
+ * @param string $error Cause.
+ * @return void
+ */
+function oli_acr_record_failure( $error ) {
+	$failure = get_option( 'oli_acr_mail_failure', array() );
+	$count   = is_array( $failure ) && isset( $failure['count'] ) ? (int) $failure['count'] : 0;
+	update_option(
+		'oli_acr_mail_failure',
+		array(
+			'count' => $count + 1,
+			'time'  => time(),
+			'error' => substr( (string) $error, 0, 500 ),
+		),
+		false
+	);
+}
+
+/**
+ * Adresse IP du client (REMOTE_ADDR ; filtrable derrière un mandataire de confiance).
+ *
+ * @return string
+ */
+function oli_acr_client_ip() {
+	$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+	/**
+	 * Filtre l'adresse IP utilisée pour la limite de débit de la capture (ex. en-tête d'un mandataire de confiance).
+	 *
+	 * @param string $ip Adresse IP.
+	 */
+	$ip = (string) apply_filters( 'oli_acr_client_ip', $ip );
+	return filter_var( $ip, FILTER_VALIDATE_IP ) ? $ip : '0.0.0.0';
+}
+
+/**
  * Nom des tables maison.
  *
  * @param string $name carts ou log.
@@ -422,5 +608,5 @@ function oli_acr_admin_date( $date ) {
 	if ( empty( $date ) ) {
 		return '—';
 	}
-	return esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), strtotime( $date . ' UTC' ) ) );
+	return esc_html( oli_acr_format_datetime( (int) strtotime( $date . ' UTC' ) ) );
 }

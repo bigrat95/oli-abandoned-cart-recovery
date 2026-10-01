@@ -140,7 +140,8 @@ class OLI_ACR_Recovery {
 		 */
 		do_action( 'oli_acr_cart_restored', $cart );
 
-		wp_safe_redirect( wc_get_checkout_url() );
+		// Paiement dans la langue du panier (page traduite ou URL de la langue).
+		wp_safe_redirect( OLI_ACR_Lang::checkout_url( OLI_ACR_Lang::resolve( (string) $cart->language ) ) );
 		exit;
 	}
 
@@ -185,7 +186,14 @@ class OLI_ACR_Recovery {
 		}
 		$email = sanitize_email( wp_unslash( $_GET['oli_acr_unsub'] ) );
 		$sig   = sanitize_text_field( wp_unslash( $_GET['oli_acr_sig'] ) );
+		$lang  = isset( $_GET['oli_acr_lang'] ) ? OLI_ACR_Lang::normalize( sanitize_text_field( wp_unslash( $_GET['oli_acr_lang'] ) ) ) : '';
 		// phpcs:enable
+		if ( '' !== $lang ) {
+			// Page affichée dans la langue du courriel (wp_die ne revient pas : pas besoin de restaurer).
+			OLI_ACR_Lang::adapter()->switch_language( $lang );
+			switch_to_locale( $lang );
+		}
+		$home  = OLI_ACR_Lang::home_url( '' !== $lang ? $lang : OLI_ACR_Lang::current_language() );
 		$title = __( 'Unsubscribe', 'oli-abandoned-cart-recovery' );
 
 		if ( ! is_email( $email ) || ! hash_equals( oli_acr_email_signature( $email ), $sig ) ) {
@@ -204,7 +212,7 @@ class OLI_ACR_Recovery {
 					__( '%s will no longer receive cart reminder emails from this store.', 'oli-abandoned-cart-recovery' ),
 					$email
 				)
-			) . '</p><p><a href="' . esc_url( home_url( '/' ) ) . '">' . esc_html__( 'Back to the store', 'oli-abandoned-cart-recovery' ) . '</a></p>';
+			) . '</p><p><a href="' . esc_url( $home ) . '">' . esc_html__( 'Back to the store', 'oli-abandoned-cart-recovery' ) . '</a></p>';
 			wp_die( wp_kses_post( $message ), esc_html( $title ), array( 'response' => 200 ) );
 		}
 

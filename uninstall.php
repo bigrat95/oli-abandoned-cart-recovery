@@ -6,6 +6,7 @@
  * Supprimé : tables (paniers et journal des courriels), options, capacité, tâches et journaux
  * Action Scheduler (actions, journaux et groupe), événements WP-Cron, fichiers de log WooCommerce
  * du plugin, métadonnées de commandes, d'utilisateurs et de coupons, clés de session WooCommerce
+ * (y compris la case de consentement « _wc_other/oli-acr/consent » des sessions), chaînes WPML
  * et coupons générés jamais utilisés.
  *
  * Conservé volontairement : les coupons générés déjà utilisés, car ils sont liés à des commandes
@@ -88,22 +89,80 @@ if ( oli_acr_uninstall_table_exists( $oli_acr_hpos_meta ) ) {
 $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->postmeta} WHERE meta_key LIKE %s OR meta_key LIKE %s", $oli_acr_like_private, $oli_acr_like_consent ) );
 $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->usermeta} WHERE meta_key LIKE %s OR meta_key LIKE %s", $oli_acr_like_private, $oli_acr_like_consent ) );
 
-// Sessions WooCommerce : retire les clés oli_acr_* des sessions en cours.
+// Sessions WooCommerce : retire les clés oli_acr_* des sessions en cours, et la case de consentement du
+// checkout en blocs (champ additionnel « oli-acr/consent »), rangée par WooCommerce dans les métadonnées
+// du client de la session : session_value['customer'] (sérialisé à part) => meta_data[] => key « _wc_other/oli-acr/consent ».
+if ( ! function_exists( 'oli_acr_uninstall_clean_session' ) ) {
+	/**
+	 * Nettoie une valeur de session WooCommerce (tableau de valeurs sérialisées une à une).
+	 *
+	 * @param array<string, mixed> $value Session désérialisée.
+	 * @return array<string, mixed>
+	 */
+	function oli_acr_uninstall_clean_session( $value ) {
+		foreach ( array_keys( $value ) as $key ) {
+			if ( 0 === strpos( (string) $key, 'oli_acr_' ) ) {
+				unset( $value[ $key ] );
+			}
+		}
+		foreach ( $value as $key => $item ) {
+			$was_serialized = is_string( $item ) && is_serialized( $item );
+			$data           = $was_serialized ? maybe_unserialize( $item ) : $item;
+			if ( ! is_array( $data ) ) {
+				continue;
+			}
+			$changed = false;
+			// Métadonnées du client (champs additionnels du checkout en blocs).
+			if ( isset( $data['meta_data'] ) && is_array( $data['meta_data'] ) ) {
+				foreach ( $data['meta_data'] as $index => $meta ) {
+					$meta_key = is_array( $meta ) && isset( $meta['key'] ) ? (string) $meta['key'] : ( is_object( $meta ) && isset( $meta->key ) ? (string) $meta->key : '' );
+					if ( false !== strpos( $meta_key, 'oli-acr/' ) || 0 === strpos( $meta_key, '_oli_acr_' ) ) {
+						unset( $data['meta_data'][ $index ] );
+						$changed = true;
+					}
+				}
+				if ( $changed ) {
+					$data['meta_data'] = array_values( $data['meta_data'] );
+				}
+			}
+			// Valeurs de champs additionnels gardées à plat (autres versions de WooCommerce).
+			foreach ( array_keys( $data ) as $data_key ) {
+				if ( false !== strpos( (string) $data_key, 'oli-acr/' ) ) {
+					unset( $data[ $data_key ] );
+					$changed = true;
+				}
+			}
+			if ( $changed ) {
+				$value[ $key ] = $was_serialized ? maybe_serialize( $data ) : $data;
+			}
+		}
+		return $value;
+	}
+}
 $oli_acr_sessions = $wpdb->prefix . 'woocommerce_sessions';
 if ( oli_acr_uninstall_table_exists( $oli_acr_sessions ) ) {
-	$oli_acr_rows = $wpdb->get_results( $wpdb->prepare( 'SELECT session_id, session_value FROM %i WHERE session_value LIKE %s', $oli_acr_sessions, '%' . $wpdb->esc_like( 'oli_acr_' ) . '%' ) );
+	$oli_acr_rows = $wpdb->get_results( $wpdb->prepare( 'SELECT session_id, session_value FROM %i WHERE session_value LIKE %s OR session_value LIKE %s', $oli_acr_sessions, '%' . $wpdb->esc_like( 'oli_acr_' ) . '%', '%' . $wpdb->esc_like( 'oli-acr/' ) . '%' ) );
 	foreach ( (array) $oli_acr_rows as $oli_acr_row ) {
 		$oli_acr_value = maybe_unserialize( $oli_acr_row->session_value );
 		if ( ! is_array( $oli_acr_value ) ) {
 			continue;
 		}
-		foreach ( array_keys( $oli_acr_value ) as $oli_acr_key ) {
-			if ( 0 === strpos( (string) $oli_acr_key, 'oli_acr_' ) ) {
-				unset( $oli_acr_value[ $oli_acr_key ] );
-			}
+		$oli_acr_clean = oli_acr_uninstall_clean_session( $oli_acr_value );
+		if ( $oli_acr_clean !== $oli_acr_value ) {
+			$wpdb->update( $oli_acr_sessions, array( 'session_value' => maybe_serialize( $oli_acr_clean ) ), array( 'session_id' => (int) $oli_acr_row->session_id ) );
 		}
-		$wpdb->update( $oli_acr_sessions, array( 'session_value' => maybe_serialize( $oli_acr_value ) ), array( 'session_id' => (int) $oli_acr_row->session_id ) );
 	}
+}
+
+// Chaînes enregistrées dans WPML String Translation (modèles et consentement).
+if ( function_exists( 'icl_unregister_string' ) ) {
+	$oli_acr_templates = get_option( 'oli_acr_templates', array() );
+	foreach ( array_keys( is_array( $oli_acr_templates ) ? $oli_acr_templates : array() ) as $oli_acr_tpl_id ) {
+		foreach ( array( 'name', 'subject', 'heading', 'content', 'button_label' ) as $oli_acr_field ) {
+			icl_unregister_string( 'oli-abandoned-cart-recovery', 'oli_acr_' . $oli_acr_tpl_id . '_' . $oli_acr_field );
+		}
+	}
+	icl_unregister_string( 'oli-abandoned-cart-recovery', 'oli_acr_consent_text' );
 }
 
 // Journaux WooCommerce du plugin (fichiers wc-logs et gestionnaire en base).
@@ -120,10 +179,13 @@ if ( oli_acr_uninstall_table_exists( $oli_acr_wc_log ) ) {
 // phpcs:enable
 
 // Options et transitoires.
-foreach ( array( 'oli_acr_settings', 'oli_acr_templates', 'oli_acr_blocklist', 'oli_acr_db_version', 'oli_acr_schedule_signature', 'woocommerce_oli_acr_admin_recovered_settings' ) as $oli_acr_option ) {
+foreach ( array( 'oli_acr_settings', 'oli_acr_templates', 'oli_acr_blocklist', 'oli_acr_db_version', 'oli_acr_schedule_signature', 'oli_acr_version', 'oli_acr_languages_signature', 'oli_acr_process_lock', 'oli_acr_mail_failure', 'oli_acr_notice_consent_migrated', 'woocommerce_oli_acr_admin_recovered_settings' ) as $oli_acr_option ) {
 	delete_option( $oli_acr_option );
 }
 delete_transient( 'oli_acr_lock' );
+// Limites de débit de la capture (transitoires par IP).
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Désinstallation, transitoires à motif.
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s", $wpdb->esc_like( '_transient_oli_acr_rl_' ) . '%', $wpdb->esc_like( '_transient_timeout_oli_acr_rl_' ) . '%' ) );
 
 // Capacité dédiée.
 foreach ( array( 'administrator', 'shop_manager' ) as $oli_acr_role_name ) {

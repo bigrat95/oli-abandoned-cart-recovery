@@ -22,6 +22,20 @@ class OLI_ACR_Mailer {
 	private static $sending = array();
 
 	/**
+	 * Cause du dernier échec d'envoi (wp_mail_failed).
+	 *
+	 * @var string
+	 */
+	private static $last_error = '';
+
+	/**
+	 * Partie texte du courriel en cours d'envoi (multipart/alternative).
+	 *
+	 * @var string
+	 */
+	private static $alt_body = '';
+
+	/**
 	 * Accroches.
 	 *
 	 * @return void
@@ -59,6 +73,7 @@ class OLI_ACR_Mailer {
 			'{recovery_button}'  => __( 'Recovery button', 'oli-abandoned-cart-recovery' ),
 			'{coupon}'           => __( 'Coupon box (empty when no coupon)', 'oli-abandoned-cart-recovery' ),
 			'{coupon_code}'      => __( 'Coupon code only', 'oli-abandoned-cart-recovery' ),
+			'{coupon_amount}'    => __( 'Coupon discount (e.g. 10 %). A paragraph with this tag is removed when there is no coupon.', 'oli-abandoned-cart-recovery' ),
 			'{unsubscribe_link}' => __( 'Unsubscribe URL', 'oli-abandoned-cart-recovery' ),
 			'{site_name}'        => __( 'Site name', 'oli-abandoned-cart-recovery' ),
 			'{site_url}'         => __( 'Site URL', 'oli-abandoned-cart-recovery' ),
@@ -76,8 +91,9 @@ class OLI_ACR_Mailer {
 	 * @return bool
 	 */
 	public static function send_cart_email( $cart, $tpl_id, $tpl ) {
-		// Envoi dans la langue enregistrée avec le panier (switch_to_locale / restore_previous_locale).
-		return (bool) oli_acr_in_locale( (string) $cart->language, array( __CLASS__, 'send_cart_email_now' ), $cart, $tpl_id, $tpl );
+		// Envoi dans la langue du panier (locale WordPress et langue de l'extension multilingue), sinon langue de repli.
+		$locale = OLI_ACR_Lang::resolve( (string) $cart->language );
+		return (bool) OLI_ACR_Lang::run_in( $locale, array( __CLASS__, 'send_cart_email_now' ), $cart, $tpl_id, $tpl, $locale );
 	}
 
 	/**
@@ -86,10 +102,12 @@ class OLI_ACR_Mailer {
 	 * @param object               $cart   Ligne de panier.
 	 * @param string               $tpl_id ID du modèle.
 	 * @param array<string, mixed> $tpl    Modèle.
+	 * @param string               $locale Langue d'envoi (vide = langue du panier).
 	 * @return bool
 	 */
-	public static function send_cart_email_now( $cart, $tpl_id, $tpl ) {
-		$tpl = OLI_ACR_Templates::localize( $tpl_id, $tpl );
+	public static function send_cart_email_now( $cart, $tpl_id, $tpl, $locale = '' ) {
+		$locale = '' !== $locale ? $locale : OLI_ACR_Lang::resolve( (string) $cart->language );
+		$tpl    = OLI_ACR_Templates::for_locale( $tpl_id, $tpl, $locale );
 		if ( oli_acr_is_unsubscribed( $cart->email ) ) {
 			return false;
 		}
@@ -101,7 +119,7 @@ class OLI_ACR_Mailer {
 				'oli_acr_recover' => $cart->token,
 				'oli_acr_log'     => $log_id,
 			),
-			home_url( '/' )
+			OLI_ACR_Lang::home_url( $locale )
 		);
 		/**
 		 * Filtre le lien de récupération d'un panier.
@@ -121,11 +139,13 @@ class OLI_ACR_Mailer {
 			'currency'   => $cart->currency,
 			'link'       => $link,
 			'coupon'     => $coupon,
+			'locale'     => $locale,
 		);
 
 		$sent = self::deliver_template( $tpl, $context );
 		if ( ! $sent ) {
 			self::delete_log( $log_id );
+			self::delete_coupon( $coupon );
 			return false;
 		}
 
@@ -135,6 +155,8 @@ class OLI_ACR_Mailer {
 			$cart->id,
 			array(
 				'status'         => 'reminded',
+				'fail_count'     => 0,
+				'last_error'     => '',
 				'emails_sent'    => (int) $cart->emails_sent + 1,
 				'sent_templates' => implode( ',', array_unique( $sent_templates ) ),
 				'last_email_at'  => oli_acr_now(),
@@ -160,7 +182,8 @@ class OLI_ACR_Mailer {
 	 * @return bool
 	 */
 	public static function send_order_email( $order, $tpl_id, $tpl ) {
-		return (bool) oli_acr_in_locale( self::order_language( $order ), array( __CLASS__, 'send_order_email_now' ), $order, $tpl_id, $tpl );
+		$locale = OLI_ACR_Lang::resolve( self::order_language( $order ) );
+		return (bool) OLI_ACR_Lang::run_in( $locale, array( __CLASS__, 'send_order_email_now' ), $order, $tpl_id, $tpl, $locale );
 	}
 
 	/**
@@ -175,10 +198,20 @@ class OLI_ACR_Mailer {
 		if ( $cart && '' !== (string) $cart->language ) {
 			return (string) $cart->language;
 		}
+		$meta = (string) $order->get_meta( 'wpml_language' );
+		if ( '' === $meta ) {
+			$meta = (string) $order->get_meta( 'trp_language' );
+		}
+		if ( '' === $meta && function_exists( 'pll_get_post_language' ) ) {
+			$meta = (string) pll_get_post_language( $order->get_id(), 'locale' );
+		}
+		if ( '' !== $meta ) {
+			return $meta;
+		}
 		if ( $order->get_customer_id() ) {
 			return get_user_locale( $order->get_customer_id() );
 		}
-		return get_locale();
+		return OLI_ACR_Lang::fallback_language();
 	}
 
 	/**
@@ -187,11 +220,13 @@ class OLI_ACR_Mailer {
 	 * @param WC_Order             $order  Commande.
 	 * @param string               $tpl_id ID du modèle.
 	 * @param array<string, mixed> $tpl    Modèle.
+	 * @param string               $locale Langue d'envoi.
 	 * @return bool
 	 */
-	public static function send_order_email_now( $order, $tpl_id, $tpl ) {
-		$tpl   = OLI_ACR_Templates::localize( $tpl_id, $tpl );
-		$email = strtolower( $order->get_billing_email() );
+	public static function send_order_email_now( $order, $tpl_id, $tpl, $locale = '' ) {
+		$locale = '' !== $locale ? $locale : OLI_ACR_Lang::resolve( self::order_language( $order ) );
+		$tpl    = OLI_ACR_Templates::for_locale( $tpl_id, $tpl, $locale );
+		$email  = strtolower( $order->get_billing_email() );
 		if ( ! is_email( $email ) || oli_acr_is_unsubscribed( $email ) ) {
 			return false;
 		}
@@ -202,7 +237,7 @@ class OLI_ACR_Mailer {
 				'oli_acr_pay' => $order->get_order_key(),
 				'oli_acr_log' => $log_id,
 			),
-			home_url( '/' )
+			OLI_ACR_Lang::home_url( $locale )
 		);
 		$items  = array();
 		foreach ( $order->get_items() as $item ) {
@@ -230,11 +265,13 @@ class OLI_ACR_Mailer {
 			'coupon'       => $coupon,
 			'order_number' => $order->get_order_number(),
 			'order_date'   => $order->get_date_created() ? wc_format_datetime( $order->get_date_created() ) : '',
+			'locale'       => $locale,
 		);
 
 		$sent = self::deliver_template( $tpl, $context );
 		if ( ! $sent ) {
 			self::delete_log( $log_id );
+			self::delete_coupon( $coupon );
 			return false;
 		}
 		$sent_templates   = (array) $order->get_meta( '_oli_acr_sent' );
@@ -246,16 +283,28 @@ class OLI_ACR_Mailer {
 	}
 
 	/**
-	 * Envoie un courriel de test à partir d'un modèle.
+	 * Envoie un courriel de test à partir d'un modèle, dans une langue (par défaut celle de l'admin).
 	 *
-	 * @param string       $to  Destinataire.
-	 * @param array<mixed> $tpl Modèle.
+	 * @param string       $to     Destinataire.
+	 * @param array<mixed> $tpl    Modèle.
+	 * @param string       $locale Langue.
 	 * @return bool
 	 */
-	public static function send_test( $to, $tpl ) {
-		if ( ! empty( $tpl['id'] ) ) {
-			$tpl = OLI_ACR_Templates::localize( (string) $tpl['id'], $tpl );
-		}
+	public static function send_test( $to, $tpl, $locale = '' ) {
+		$locale = '' !== $locale ? OLI_ACR_Lang::resolve( $locale ) : OLI_ACR_Lang::admin_language();
+		return (bool) OLI_ACR_Lang::run_in( $locale, array( __CLASS__, 'send_test_now' ), $to, $tpl, $locale );
+	}
+
+	/**
+	 * Courriel de test, dans la langue courante.
+	 *
+	 * @param string       $to     Destinataire.
+	 * @param array<mixed> $tpl    Modèle.
+	 * @param string       $locale Langue.
+	 * @return bool
+	 */
+	public static function send_test_now( $to, $tpl, $locale ) {
+		$tpl      = OLI_ACR_Templates::for_locale( (string) $tpl['id'], $tpl, $locale );
 		$items    = array();
 		$products = wc_get_products(
 			array(
@@ -287,6 +336,7 @@ class OLI_ACR_Mailer {
 			'order_number' => '1234',
 			'order_date'   => wc_format_datetime( new WC_DateTime() ),
 			'test'         => true,
+			'locale'       => $locale,
 		);
 		/* translators: %s: email subject. */
 		$tpl['subject'] = sprintf( __( '[Test] %s', 'oli-abandoned-cart-recovery' ), $tpl['subject'] );
@@ -315,26 +365,29 @@ class OLI_ACR_Mailer {
 				'order_number' => '',
 				'order_date'   => '',
 				'test'         => false,
+				'locale'       => '',
 			)
 		);
 
 		// Courriel test : lien de désabonnement factice, sans effet (aucune adresse n'est exclue).
-		$unsub      = $context['test'] ? '#' : oli_acr_unsubscribe_url( $context['email'] );
+		$unsub      = $context['test'] ? '#' : oli_acr_unsubscribe_url( $context['email'], (string) $context['locale'] );
+		$amount     = self::coupon_amount_text( $tpl );
 		$first_name = '' !== $context['first_name'] ? $context['first_name'] : __( 'there', 'oli-abandoned-cart-recovery' );
 		$price_args = array( 'currency' => $context['currency'] );
 		$button     = '' !== $tpl['button_label'] ? $tpl['button_label'] : __( 'Complete my order', 'oli-abandoned-cart-recovery' );
 
 		$text_map = array(
-			'{first_name}'   => $context['first_name'],
-			'{last_name}'    => $context['last_name'],
-			'{full_name}'    => trim( $context['first_name'] . ' ' . $context['last_name'] ),
-			'{email}'        => $context['email'],
-			'{site_name}'    => wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ),
-			'{site_url}'     => home_url( '/' ),
-			'{order_number}' => $context['order_number'],
-			'{order_date}'   => $context['order_date'],
-			'{coupon_code}'  => $context['coupon'],
-			'{cart_total}'   => wp_strip_all_tags( wc_price( $context['total'], $price_args ) ),
+			'{first_name}'    => $context['first_name'],
+			'{last_name}'     => $context['last_name'],
+			'{full_name}'     => trim( $context['first_name'] . ' ' . $context['last_name'] ),
+			'{email}'         => $context['email'],
+			'{site_name}'     => wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES ),
+			'{site_url}'      => home_url( '/' ),
+			'{order_number}'  => $context['order_number'],
+			'{order_date}'    => $context['order_date'],
+			'{coupon_code}'   => $context['coupon'],
+			'{coupon_amount}' => $amount,
+			'{cart_total}'    => wp_strip_all_tags( wc_price( $context['total'], $price_args ) ),
 		);
 
 		$html_map = array(
@@ -347,6 +400,7 @@ class OLI_ACR_Mailer {
 			'{order_number}'     => esc_html( $text_map['{order_number}'] ),
 			'{order_date}'       => esc_html( $text_map['{order_date}'] ),
 			'{coupon_code}'      => esc_html( $context['coupon'] ),
+			'{coupon_amount}'    => esc_html( $amount ),
 			'{cart_total}'       => wc_price( $context['total'], $price_args ),
 			'{recovery_link}'    => esc_url( $context['link'] ),
 			'{unsubscribe_link}' => esc_url( $unsub ),
@@ -358,8 +412,13 @@ class OLI_ACR_Mailer {
 		// Nettoie les restes de ponctuation quand le prénom est inconnu (ex. « , vous avez oublié… »).
 		$subject = self::tidy( strtr( $tpl['subject'], $text_map ) );
 		$heading = self::tidy( strtr( $tpl['heading'], $text_map ) );
-		$body    = strtr( wpautop( $tpl['content'] ), $html_map );
-		$body   .= '<p style="font-size:12px;color:#777;text-align:center;margin-top:30px">' . sprintf(
+		$content = (string) $tpl['content'];
+		if ( '' === (string) $context['coupon'] ) {
+			// Sans coupon, la phrase d'introduction du coupon n'a pas de sens : son paragraphe est retiré.
+			$content = (string) preg_replace( '#<p\b[^>]*>(?:(?!</p>).)*\{coupon_amount\}(?:(?!</p>).)*</p>#is', '', $content );
+		}
+		$body  = strtr( wpautop( $content ), $html_map );
+		$body .= '<p style="font-size:12px;color:#777;text-align:center;margin-top:30px">' . sprintf(
 			/* translators: %s: unsubscribe link. */
 			esc_html__( 'You received this email because you started an order on our store. %s', 'oli-abandoned-cart-recovery' ),
 			'<a href="' . esc_url( $unsub ) . '">' . esc_html__( 'Unsubscribe', 'oli-abandoned-cart-recovery' ) . '</a>'
@@ -407,19 +466,120 @@ class OLI_ACR_Mailer {
 			$headers[] = 'List-Unsubscribe-Post: List-Unsubscribe=One-Click';
 		}
 
-		self::$sending = array(
+		self::$sending    = array(
 			'name'  => oli_acr_get_setting( 'sender_name' ),
 			'email' => oli_acr_get_setting( 'sender_email' ),
 		);
+		self::$last_error = '';
+		self::$alt_body   = self::html_to_text( $heading, $body );
 		add_filter( 'woocommerce_email_from_name', array( __CLASS__, 'filter_from_name' ), 99 );
 		add_filter( 'woocommerce_email_from_address', array( __CLASS__, 'filter_from_address' ), 99 );
+		add_action( 'wp_mail_failed', array( __CLASS__, 'capture_failure' ) );
+		add_action( 'phpmailer_init', array( __CLASS__, 'add_alt_body' ), 99 );
 		$sent = $mailer->send( $to, $subject, $message, implode( "\r\n", $headers ) . "\r\n" );
+		remove_action( 'phpmailer_init', array( __CLASS__, 'add_alt_body' ), 99 );
+		remove_action( 'wp_mail_failed', array( __CLASS__, 'capture_failure' ) );
 		remove_filter( 'woocommerce_email_from_name', array( __CLASS__, 'filter_from_name' ), 99 );
 		remove_filter( 'woocommerce_email_from_address', array( __CLASS__, 'filter_from_address' ), 99 );
-		self::$sending = array();
+		self::$sending  = array();
+		self::$alt_body = '';
 
-		oli_acr_log( sprintf( 'Courriel « %s » envoyé à %s : %s', $subject, $to, $sent ? 'oui' : 'non' ) );
+		if ( ! $sent && '' === self::raw_error() ) {
+			self::$last_error = __( 'wp_mail() returned false (no error message was given by the mailer).', 'oli-abandoned-cart-recovery' );
+		}
+		oli_acr_log( sprintf( 'Email "%s" to %s: %s', $subject, $to, $sent ? 'sent' : 'failed (' . self::$last_error . ')' ), $sent ? 'info' : 'error' );
 		return (bool) $sent;
+	}
+
+	/**
+	 * Mémorise la cause d'un échec de wp_mail().
+	 *
+	 * @param WP_Error $error Erreur.
+	 * @return void
+	 */
+	public static function capture_failure( $error ) {
+		if ( is_wp_error( $error ) ) {
+			self::$last_error = wp_strip_all_tags( $error->get_error_message() );
+		}
+	}
+
+	/**
+	 * Cause brute du dernier échec (vide si wp_mail_failed n'a rien signalé).
+	 *
+	 * @return string
+	 */
+	private static function raw_error() {
+		return self::$last_error;
+	}
+
+	/**
+	 * Cause du dernier échec d'envoi.
+	 *
+	 * @return string
+	 */
+	public static function last_error() {
+		return '' !== self::$last_error ? self::$last_error : __( 'Unknown error', 'oli-abandoned-cart-recovery' );
+	}
+
+	/**
+	 * Ajoute la partie texte (multipart/alternative) au courriel en cours.
+	 *
+	 * @param PHPMailer\PHPMailer\PHPMailer $phpmailer Instance.
+	 * @return void
+	 */
+	public static function add_alt_body( $phpmailer ) {
+		if ( '' !== self::$alt_body && 'text/html' === $phpmailer->ContentType ) { // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- Propriété de PHPMailer.
+			$phpmailer->AltBody = self::$alt_body; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- Propriété de PHPMailer.
+		}
+	}
+
+	/**
+	 * Version texte d'un courriel HTML : liens en clair, tableaux et paragraphes sur des lignes.
+	 *
+	 * @param string $heading En-tête.
+	 * @param string $html    Corps HTML.
+	 * @return string
+	 */
+	public static function html_to_text( $heading, $html ) {
+		$html = (string) preg_replace( '#<(head|style|script)\b[^>]*>.*?</\1>#is', '', (string) $html );
+		$html = (string) preg_replace( '#<img\b[^>]*>#i', '', $html );
+		$html = (string) preg_replace_callback(
+			'#<a\b[^>]*href=(["\'])(.*?)\1[^>]*>(.*?)</a>#is',
+			static function ( $m ) {
+				$url  = html_entity_decode( $m[2], ENT_QUOTES, 'UTF-8' );
+				$text = trim( html_entity_decode( wp_strip_all_tags( $m[3] ), ENT_QUOTES, 'UTF-8' ) );
+				if ( '' === $url || '#' === $url || $text === $url ) {
+					return '' !== $text ? $text : $url;
+				}
+				return ( '' !== $text ? $text . ' : ' : '' ) . $url;
+			},
+			$html
+		);
+		$html = (string) preg_replace( '#<br\s*/?>#i', "\n", $html );
+		$html = (string) preg_replace( '#</(p|div|h[1-6]|tr|table|li|ul|ol)>#i', "\n\n", $html );
+		$html = (string) preg_replace( '#</t[dh]>#i', '   ', $html );
+		$text = html_entity_decode( wp_strip_all_tags( $html ), ENT_QUOTES, 'UTF-8' );
+		$text = (string) preg_replace( '/[ \t\x{00A0}]+/u', ' ', $text );
+		$text = implode( "\n", array_map( 'trim', explode( "\n", $text ) ) );
+		$text = trim( (string) preg_replace( "/\n{3,}/", "\n\n", $text ) );
+		$head = trim( wp_strip_all_tags( (string) $heading ) );
+		return ( '' !== $head ? $head . "\n\n" : '' ) . $text;
+	}
+
+	/**
+	 * Supprime un coupon généré pour un envoi qui a échoué (le nouvel essai en créera un autre).
+	 *
+	 * @param string $code Code.
+	 * @return void
+	 */
+	public static function delete_coupon( $code ) {
+		if ( '' === (string) $code ) {
+			return;
+		}
+		$id = wc_get_coupon_id_by_code( $code );
+		if ( $id ) {
+			wp_delete_post( $id, true );
+		}
 	}
 
 	/**
@@ -481,6 +641,21 @@ class OLI_ACR_Mailer {
 	}
 
 	/**
+	 * Rabais du coupon d'un modèle, en texte (10 % ou 5,00 $).
+	 *
+	 * @param array<mixed> $tpl Modèle.
+	 * @return string
+	 */
+	public static function coupon_amount_text( $tpl ) {
+		$amount = isset( $tpl['coupon_amount'] ) ? (float) $tpl['coupon_amount'] : 0;
+		if ( isset( $tpl['coupon_type'] ) && 'fixed_cart' === $tpl['coupon_type'] ) {
+			return html_entity_decode( wp_strip_all_tags( wc_price( $amount ) ), ENT_QUOTES, 'UTF-8' );
+		}
+		/* translators: %s: discount percentage (number). */
+		return sprintf( __( '%s%%', 'oli-abandoned-cart-recovery' ), wc_format_localized_decimal( (string) ( 0.0 === fmod( $amount, 1.0 ) ? (int) $amount : $amount ) ) );
+	}
+
+	/**
 	 * Bloc coupon.
 	 *
 	 * @param string $code Code.
@@ -516,6 +691,16 @@ class OLI_ACR_Mailer {
 	 */
 	public static function maybe_create_coupon( $tpl, $email, $log_id ) {
 		if ( 'yes' !== $tpl['coupon_enabled'] || (float) $tpl['coupon_amount'] <= 0 ) {
+			return '';
+		}
+		/**
+		 * B4 : pas de coupon si le courriel ne montre pas son code ({coupon} ou {coupon_code}) : il serait créé
+		 * pour rien et le client ne le verrait jamais. Le filtre permet de forcer la création (usage avancé).
+		 *
+		 * @param bool         $create Créer le coupon.
+		 * @param array<mixed> $tpl    Modèle résolu dans la langue du courriel.
+		 */
+		if ( ! apply_filters( 'oli_acr_create_coupon', OLI_ACR_Templates::shows_coupon( $tpl ), $tpl ) ) {
 			return '';
 		}
 		$prefix = strtoupper( preg_replace( '/[^A-Za-z0-9\-_]/', '', (string) oli_acr_get_setting( 'coupon_prefix' ) ) );

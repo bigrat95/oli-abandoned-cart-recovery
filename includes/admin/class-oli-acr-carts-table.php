@@ -184,6 +184,13 @@ class OLI_ACR_Carts_Table extends WP_List_Table {
 				$labels = oli_acr_statuses();
 				$label  = isset( $labels[ $item->status ] ) ? $labels[ $item->status ] : $item->status;
 				$extra  = ( 'recovered' === $item->status && 'direct' === $item->recovered_via ) ? '<br><small>' . esc_html__( '(ordered without reminder)', 'oli-abandoned-cart-recovery' ) . '</small>' : '';
+				if ( 'failed' === $item->status ) {
+					$extra .= '<br><small class="oli-acr-error">' . esc_html( (string) $item->last_error ) . '</small><br><small>' . ( $item->next_send_at
+						/* translators: 1: number of failed attempts, 2: date of the next attempt. */
+						? sprintf( esc_html__( '%1$d failed attempt(s), next attempt: %2$s', 'oli-abandoned-cart-recovery' ), (int) $item->fail_count, oli_acr_admin_date( $item->next_send_at ) )
+						/* translators: %d: number of failed attempts. */
+						: sprintf( esc_html__( '%d failed attempt(s), no further attempt. Use "Send next reminder now" after fixing your mail settings.', 'oli-abandoned-cart-recovery' ), (int) $item->fail_count ) ) . '</small>';
+				}
 				return '<mark class="oli-acr-status oli-acr-status-' . esc_attr( $item->status ) . '">' . esc_html( $label ) . '</mark>' . $extra;
 			case 'items':
 				$lines = array();

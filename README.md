@@ -1,6 +1,6 @@
 # Oli Abandoned Cart Recovery
 
-Extension WooCommerce légère de récupération des **paniers abandonnés** et des **commandes en attente**. Le courriel est capturé dès qu'il est tapé au checkout (classique **et** en blocs), même pour un visiteur qui ne passe jamais de commande. Une séquence de relances part ensuite, avec des coupons uniques, un lien de récupération sécurisé, un lien de désabonnement et des rapports.
+Extension WooCommerce légère de récupération des **paniers abandonnés** et des **commandes en attente**. Une fois la case de consentement cochée, le courriel et le panier sont enregistrés au checkout (classique **et** en blocs), même pour un visiteur qui ne passe jamais de commande. Une séquence de relances part ensuite, avec des coupons uniques, un lien de récupération sécurisé, un lien de désabonnement et des rapports.
 
 - **Slug / text domain :** `oli-abandoned-cart-recovery`
 - **Préfixe :** `oli_acr_` / `OLI_ACR_` (fonctions, options, tables, crochets, constantes)
@@ -15,14 +15,43 @@ Extension WooCommerce légère de récupération des **paniers abandonnés** et 
 - Un seul écouteur délégué sur le document : fonctionne avec le checkout classique (`#billing_email`) et en blocs (`#email`).
 - Téléphone, prénom et nom captés avec le courriel.
 - Clients connectés : panier mis à jour à chaque changement (`woocommerce_cart_updated`, comparaison d'empreinte pour éviter les écritures inutiles).
-- **Consentement d'abord (défaut depuis 1.0.1, Loi 25 / RGPD)** : pour un visiteur non connecté, rien n'est transmis ni enregistré (ni courriel, ni téléphone, ni panier) tant que la case de consentement n'est pas cochée (classique et blocs). Le texte par défaut suit la langue du visiteur ; un texte personnalisé est possible. Modes « toujours » et « jamais » offerts dans les réglages ; une installation 1.0.0 garde le mode déjà enregistré.
+- **Consentement d'abord (Loi 25 / RGPD)** : interrupteur unique « Exiger le consentement », activé par défaut, qui vaut pour les invités **et** les clients connectés. Tant que la case n'est pas cochée, rien n'est transmis ni enregistré (ni courriel, ni téléphone, ni panier) et aucune relance ne part. Le consentement d'un client connecté est mémorisé dans sa fiche (méta `_oli_acr_consent`), case précochée et retirable. Interrupteur désactivé : invités et clients connectés suivis sans case, avertissement permanent dans l'admin (Loi 25, RGPD, responsabilité de l'installateur). Option « jamais » pour les invités. Mise à jour depuis 1.0.x en mode « toujours » : passage au consentement (interrupteur activé) avec un avis jusqu'à fermeture ; les paniers de clients connectés captés sans case par la 1.0.x ne sont plus relancés.
+
+  | Interrupteur « Exiger le consentement » | Invité | Client connecté |
+  |---|---|---|
+  | **Activé** (par défaut) | Case à cocher ; rien n'est capté ni relancé sans elle | Case à cocher (précochée si déjà consenti, méta `_oli_acr_consent`) ; rien n'est suivi ni relancé sans consentement ; décocher efface la méta et le panier |
+  | **Désactivé** (avertissement Loi 25 / RGPD permanent) | Capté et relancé sans case | Suivi et relancé sans case |
+
+  Colonne `consent` du panier : 1 **seulement** pour une case réellement cochée (ou la méta d'un client connecté). Capté avec l'interrupteur OFF : `consent=0`, donc jamais relancé si on le rallume. Migration depuis 1.0.x : `consent=0` pour **tous** les paniers 1.0.x, invités et clients connectés (`OLI_ACR_Install::reset_legacy_consent()`), car la 1.0.x ne gardait pas la source du consentement (N1 : site passé de « toujours » à « consentement » avant la mise à jour). Les relances de commandes en attente ne dépendent pas du consentement (décision d'Olivier).
+- **Coupon** : créé seulement si le courriel (dans sa langue) contient `{coupon}` ou `{coupon_code}` ; sinon avertissement dans la liste et l'éditeur des modèles (filtre `oli_acr_create_coupon`).
+- **Texte de consentement avec liens** : éditeur par langue (`wp_editor` minimal), enregistré avec `wp_kses` (liens `href`/`target`/`rel`, `strong`, `em`). Champ vide = texte par défaut traduisible. Au checkout en blocs (libellé texte seulement), le script remplace le libellé par la version HTML filtrée.
+- **Échecs d'envoi** : statut « Échec d'envoi », cause (`wp_mail_failed`), nouveaux essais après 5 min, 30 min et 2 h (`oli_acr_retry_delays`), avis admin, journal WooCommerce niveau `error` même sans `WP_DEBUG` (`oli_acr_log_errors`).
+- **Robustesse** : verrou atomique en option (`oli_acr_process_lock`, durée `oli_acr_lock_ttl`, 10 min, renouvelé) avec budget de temps (`oli_acr_time_budget`) et réclamation de chaque panier avant l'envoi ; compatible stockage des commandes sans HPOS ; partie texte (multipart/alternative) ; limites de débit de la capture (`oli_acr_capture_rate_limits`, IP via `oli_acr_client_ip`) et piège à robots ; nonce frais (`?wc-ajax=oli_acr_nonce`) si la page est en cache, pages de paiement en no-cache (`DONOTCACHEPAGE`).
 - Choix des rôles suivis.
 - Photo du panier : produits, quantités, variations, total, devise et langue, reliée à la session WooCommerce et à un jeton de 32 caractères.
+
+### Multilingue (1.1.0)
+- **Adaptateurs** (`includes/lang/`) : classe de base `OLI_ACR_Lang_Adapter` ; `OLI_ACR_Lang_WPML`, `_Polylang`, `_TranslatePress`, `_Weglot`, `_Core`. Priorité : WPML, Polylang, TranslatePress, Weglot, puis le cœur. Filtre `oli_acr_lang_adapters` pour en ajouter ou en retirer. Toutes les langues sont des locales WordPress (`fr_CA`, `en_US`).
+- **Polylang gratuit** : WooCommerce ne reconnaît pas les pages panier et paiement traduites ; sans « Polylang for WooCommerce » (ou le filtre `woocommerce_get_checkout_page_id` / `woocommerce_get_cart_page_id` donné dans la FAQ du readme), aucun panier n'est capté dans les autres langues. Un avis admin (`oli-acr-polylang-wc`) l'indique tant que rien ne relie ces pages (filtre `oli_acr_polylang_checkout_bridged`).
+- **Modèles par langue** : `texts[locale] = {name, subject, heading, content, button_label}` ; les champs de premier niveau sont le miroir de la langue de repli (compatibilité 1.0.x et filtres). Délai, coupon, type et statut sont communs.
+- **Consentement par langue** : réglage `consent_texts[locale]` (`consent_text` = miroir de la langue de repli).
+- **Langue de repli** : réglage `fallback_language` (vide = langue par défaut du site ou de l'extension).
+- **Ordre de priorité, champ par champ** (`OLI_ACR_Templates::for_locale()`, `oli_acr_consent_text()`) :
+  1. texte saisi dans l'onglet de la langue ;
+  2. traduction WPML String Translation / Polylang de la chaîne de la langue de repli (domaine / groupe `oli-abandoned-cart-recovery` / « Oli Abandoned Cart Recovery », noms `oli_acr_{id}_{champ}` et `oli_acr_consent_text`) ;
+  3. texte par défaut traduit dans la langue (si le champ de repli est encore celui par défaut et si le plugin a cette traduction) ;
+  4. texte de la langue de repli.
+- **Langue du panier** : transmise par la page (`oliAcrCapture.lang`, calculée au rendu de la page de paiement), car l'appel `wc-ajax` ne passe pas toujours par l'URL de la langue.
+- **Liens** : récupération et désabonnement construits sur l'accueil de la langue (`OLI_ACR_Lang::home_url()`), redirection vers la page de paiement de la langue (`OLI_ACR_Lang::checkout_url()`, page traduite avec WPML / Polylang), page de désabonnement affichée dans la langue (`oli_acr_lang`). Filtre `oli_acr_translate_url`.
+- **Migration 1.0.x → 1.1.0** (`OLI_ACR_Install::migrate()`, idempotente) : textes existants = textes de la langue de repli ; modèles par défaut non modifiés = textes par défaut dans chaque langue active ; une langue ajoutée plus tard est remplie de la même façon.
+- **Polylang + WooCommerce** : pour que la page de paiement traduite soit reconnue comme page de paiement, il faut « Polylang for WooCommerce » (ou l'équivalent du filtre `woocommerce_get_checkout_page_id`).
+- **Weglot** traduit le HTML à la volée et n'a pas de module de chaînes : utilisez les onglets de langue.
 
 ### Relances
 - Plusieurs modèles, chacun avec délai, sujet, en-tête, adresse de réponse, contenu, libellé du bouton et statut actif/inactif, envoyés en séquence.
 - Balises : `{first_name}`, `{last_name}`, `{full_name}`, `{email}`, `{cart_items}`, `{cart_total}`, `{recovery_link}`, `{recovery_button}`, `{coupon}`, `{coupon_code}`, `{unsubscribe_link}`, `{site_name}`, `{site_url}`, `{order_number}`, `{order_date}`.
-- Envoi dans la langue enregistrée avec le panier (`switch_to_locale()` / `restore_previous_locale()`). Les modèles par défaut restent traduisibles et sont rendus dans cette langue tant que l'admin ne les a pas modifiés ; un modèle modifié part tel qu'écrit (pas de modèle distinct par langue).
+- Envoi dans la langue enregistrée avec le panier (locale WordPress et langue de l'extension multilingue), voir « Multilingue » ci-dessous.
+- Balise `{coupon_amount}` (rabais formaté) ; les modèles par défaut ont une phrase d'introduction traduisible avant le code, retirée s'il n'y a pas de coupon.
 - Gabarit WooCommerce (`WC()->mailer()->wrap_message()` + `WC_Emails::send()`), en-têtes `List-Unsubscribe` et `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058).
 - Coupons uniques (préfixe, pourcentage ou montant fixe, validité, usage unique, restreints au courriel du client), appliqués automatiquement au clic, puis mis à la corbeille une fois utilisés ou expirés.
 - Commandes en attente : modèles dédiés, délai de départ, lien « payer la commande », annulation automatique des vieilles commandes relancées.

@@ -20,10 +20,12 @@ class OLI_ACR_Install {
 	 * @return void
 	 */
 	public static function activate() {
+		// Les textes par défaut des modèles sont créés dans chaque langue : il faut les traductions du plugin.
+		oli_acr_load_textdomain();
 		self::create_tables();
 		self::add_caps();
 		if ( false === get_option( 'oli_acr_settings' ) ) {
-			add_option( 'oli_acr_settings', oli_acr_default_settings(), '', false );
+			add_option( 'oli_acr_settings', oli_acr_default_settings(), '', true );
 		}
 		if ( false === get_option( 'oli_acr_templates' ) ) {
 			add_option( 'oli_acr_templates', OLI_ACR_Templates::default_templates(), '', false );
@@ -31,6 +33,7 @@ class OLI_ACR_Install {
 		if ( false === get_option( 'oli_acr_blocklist' ) ) {
 			add_option( 'oli_acr_blocklist', array(), '', false );
 		}
+		self::migrate();
 		// La planification est (re)créée au prochain chargement.
 		delete_option( 'oli_acr_schedule_signature' );
 	}
@@ -55,6 +58,91 @@ class OLI_ACR_Install {
 			self::create_tables();
 			self::add_caps();
 		}
+		if ( get_option( 'oli_acr_version' ) !== OLI_ACR_VERSION ) {
+			self::migrate();
+		}
+		// Une langue ajoutée au site reçoit les textes par défaut des modèles non modifiés.
+		$signature = md5( implode( ',', OLI_ACR_Lang::languages() ) . '|' . OLI_ACR_Lang::adapter()->id() );
+		if ( get_option( 'oli_acr_languages_signature' ) !== $signature ) {
+			OLI_ACR_Templates::sync_languages();
+			update_option( 'oli_acr_languages_signature', $signature, true );
+		}
+	}
+
+	/**
+	 * Migration vers les textes par langue (1.1.0).
+	 *
+	 * - Modèles : les textes de la 1.0.x deviennent ceux de la langue de repli ; un modèle par défaut
+	 *   non modifié reçoit ses textes dans chaque langue active (sync_languages()).
+	 * - Consentement : un texte personnalisé devient celui de la langue de repli.
+	 * Idempotente : peut être relancée sans effet de bord.
+	 *
+	 * @return void
+	 */
+	public static function migrate() {
+		$from     = (string) get_option( 'oli_acr_version', '' );
+		$settings = get_option( 'oli_acr_settings' );
+		$legacy   = '' === $from || version_compare( $from, '1.1.0', '<' );
+		if ( $legacy ) {
+			self::reset_legacy_consent();
+		}
+		if ( is_array( $settings ) ) {
+			// R2 (Loi 25, RGPD) : une installation 1.0.x en mode « toujours » repasse au consentement (interrupteur activé).
+			if ( $legacy && isset( $settings['guest_tracking'] ) && 'always' === $settings['guest_tracking'] ) {
+				$settings['guest_tracking'] = 'consent';
+				update_option( 'oli_acr_notice_consent_migrated', time(), true );
+			}
+			$texts    = isset( $settings['consent_texts'] ) && is_array( $settings['consent_texts'] ) ? $settings['consent_texts'] : array();
+			$fallback = OLI_ACR_Lang::fallback_language();
+			$legacy   = isset( $settings['consent_text'] ) ? (string) $settings['consent_text'] : '';
+			if ( '' !== trim( $legacy ) && ! oli_acr_is_default_consent_text( $legacy ) && empty( $texts[ $fallback ] ) ) {
+				$texts[ $fallback ] = $legacy;
+			}
+			$settings['consent_texts'] = $texts;
+			if ( ! isset( $settings['fallback_language'] ) ) {
+				$settings['fallback_language'] = '';
+			}
+			update_option( 'oli_acr_settings', $settings, true );
+		}
+		OLI_ACR_Templates::sync_languages();
+		update_option( 'oli_acr_version', OLI_ACR_VERSION, true );
+		// R8 : options lues à chaque page, chargées d'avance (les installations 1.0.x les avaient en autoload=off).
+		wp_set_option_autoload_values(
+			array(
+				'oli_acr_settings'            => true,
+				'oli_acr_db_version'          => true,
+				'oli_acr_version'             => true,
+				'oli_acr_languages_signature' => true,
+				'oli_acr_schedule_signature'  => true,
+			)
+		);
+		// Réglages de l'avis « vente récupérée » (WC_Email) : WooCommerce les lit sur les pages qui chargent les courriels.
+		if ( false === get_option( 'woocommerce_oli_acr_admin_recovered_settings' ) ) {
+			add_option( 'woocommerce_oli_acr_admin_recovered_settings', array(), '', true );
+		}
+		// Ancien verrou (transient) remplacé par le verrou atomique « oli_acr_process_lock ».
+		delete_transient( 'oli_acr_lock' );
+	}
+
+	/**
+	 * B1 et N1 (Loi 25) : la 1.0.x enregistrait consent=1 sans case cochée pour les invités en mode « toujours »
+	 * et pour tous les clients connectés, et ne gardait pas la source du consentement. Un site passé du mode
+	 * « toujours » au mode consentement AVANT la mise à jour garde donc des paniers invités sans consentement
+	 * explicite, impossibles à distinguer des autres. Par prudence, tous les paniers 1.0.x (invités et clients
+	 * connectés) passent à consent=0 : ils ne sont plus relancés tant que le client n'a pas coché la case
+	 * dans la 1.1.0. Les relances de commandes en attente ne dépendent pas de cette colonne.
+	 *
+	 * @return void
+	 */
+	public static function reset_legacy_consent() {
+		global $wpdb;
+		$table = oli_acr_table( 'carts' );
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table(), jamais une saisie ; migration ponctuelle.
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
+			return;
+		}
+		$wpdb->query( "UPDATE {$table} SET consent = 0 WHERE consent = 1" );
+		// phpcs:enable
 	}
 
 	/**
@@ -88,6 +176,8 @@ class OLI_ACR_Install {
   status varchar(20) NOT NULL DEFAULT 'open',
   consent tinyint(1) NOT NULL DEFAULT 0,
   emails_sent smallint(5) unsigned NOT NULL DEFAULT 0,
+  fail_count smallint(5) unsigned NOT NULL DEFAULT 0,
+  last_error text NULL,
   sent_templates varchar(255) NOT NULL DEFAULT '',
   next_send_at datetime NULL DEFAULT NULL,
   last_email_at datetime NULL DEFAULT NULL,
@@ -127,7 +217,7 @@ CREATE TABLE {$log} (
 ) {$collate};";
 
 		dbDelta( $sql );
-		update_option( 'oli_acr_db_version', OLI_ACR_DB_VERSION, false );
+		update_option( 'oli_acr_db_version', OLI_ACR_DB_VERSION, true );
 	}
 
 	/**

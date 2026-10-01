@@ -18,6 +18,21 @@ class OLI_ACR_Scheduler {
 	const HOOK_PROCESS = 'oli_acr_process';
 	const HOOK_DAILY   = 'oli_acr_daily_cleanup';
 	const GROUP        = 'oli-abandoned-cart-recovery';
+	const LOCK_OPTION  = 'oli_acr_process_lock';
+
+	/**
+	 * Jeton et échéance du verrou détenu par ce processus.
+	 *
+	 * @var array{token: string, expires: int}|null
+	 */
+	private static $lock = null;
+
+	/**
+	 * Début du passage en cours (budget de temps).
+	 *
+	 * @var int
+	 */
+	private static $started = 0;
 
 	/**
 	 * Accroches.
@@ -29,6 +44,8 @@ class OLI_ACR_Scheduler {
 		add_action( self::HOOK_DAILY, array( __CLASS__, 'daily_cleanup' ) );
 		add_filter( 'cron_schedules', array( __CLASS__, 'cron_schedules' ) ); // phpcs:ignore WordPress.WP.CronInterval.ChangeDetected
 		add_action( 'init', array( __CLASS__, 'maybe_schedule' ), 20 );
+		// Sans HPOS, wc_get_orders() ignore « meta_query » : la condition est ajoutée à la requête WP_Query.
+		add_filter( 'woocommerce_order_data_store_cpt_get_orders_query', array( __CLASS__, 'cpt_orders_query' ), 10, 2 );
 	}
 
 	/**
@@ -73,7 +90,7 @@ class OLI_ACR_Scheduler {
 			wp_schedule_event( time() + MINUTE_IN_SECONDS, 'oli_acr_interval', self::HOOK_PROCESS );
 			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::HOOK_DAILY );
 		}
-		update_option( 'oli_acr_schedule_signature', $signature );
+		update_option( 'oli_acr_schedule_signature', $signature, true );
 	}
 
 	/**
@@ -105,25 +122,189 @@ class OLI_ACR_Scheduler {
 	}
 
 	/**
-	 * Traitement récurrent.
+	 * Durée de vie du verrou en secondes : un passage bloqué (processus tué) le libère après ce délai.
+	 *
+	 * @return int
+	 */
+	public static function lock_ttl() {
+		/**
+		 * Filtre la durée de vie du verrou du traitement récurrent (10 minutes par défaut).
+		 *
+		 * @param int $ttl Secondes.
+		 */
+		return max( 60, (int) apply_filters( 'oli_acr_lock_ttl', 10 * MINUTE_IN_SECONDS ) );
+	}
+
+	/**
+	 * Prend le verrou (atomique : INSERT IGNORE, puis comparer-et-remplacer s'il est expiré).
+	 *
+	 * @return bool
+	 */
+	public static function acquire_lock() {
+		global $wpdb;
+		$token   = wp_generate_password( 20, false, false );
+		$expires = time() + self::lock_ttl();
+		$value   = $token . '|' . $expires;
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Verrou atomique : le cache d'options ne doit pas intervenir.
+		$inserted = (int) $wpdb->query( $wpdb->prepare( "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'no')", self::LOCK_OPTION, $value ) );
+		if ( ! $inserted ) {
+			$current = (string) $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", self::LOCK_OPTION ) );
+			$parts   = explode( '|', $current );
+			if ( isset( $parts[1] ) && (int) $parts[1] > time() ) {
+				return false;
+			}
+			// Verrou expiré : un seul processus peut le remplacer.
+			$inserted = (int) $wpdb->query( $wpdb->prepare( "UPDATE {$wpdb->options} SET option_value = %s WHERE option_name = %s AND option_value = %s", $value, self::LOCK_OPTION, $current ) );
+		}
+		// phpcs:enable
+		wp_cache_delete( self::LOCK_OPTION, 'options' );
+		if ( ! $inserted ) {
+			return false;
+		}
+		self::$lock = array(
+			'token'   => $token,
+			'expires' => $expires,
+		);
+		return true;
+	}
+
+	/**
+	 * Renouvelle le verrou s'il a consommé la moitié de sa durée de vie.
+	 *
+	 * @return bool Faux si le verrou a été perdu.
+	 */
+	public static function renew_lock() {
+		global $wpdb;
+		if ( ! self::$lock ) {
+			return false;
+		}
+		if ( self::$lock['expires'] - time() > self::lock_ttl() / 2 ) {
+			return true;
+		}
+		$old     = self::$lock['token'] . '|' . self::$lock['expires'];
+		$expires = time() + self::lock_ttl();
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Verrou atomique.
+		$ok = (int) $wpdb->query( $wpdb->prepare( "UPDATE {$wpdb->options} SET option_value = %s WHERE option_name = %s AND option_value = %s", self::$lock['token'] . '|' . $expires, self::LOCK_OPTION, $old ) );
+		wp_cache_delete( self::LOCK_OPTION, 'options' );
+		if ( $ok ) {
+			self::$lock['expires'] = $expires;
+			return true;
+		}
+		self::$lock = null;
+		return false;
+	}
+
+	/**
+	 * Libère le verrou s'il nous appartient encore.
+	 *
+	 * @return void
+	 */
+	public static function release_lock() {
+		global $wpdb;
+		if ( ! self::$lock ) {
+			return;
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Verrou atomique.
+		$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name = %s AND option_value = %s", self::LOCK_OPTION, self::$lock['token'] . '|' . self::$lock['expires'] ) );
+		wp_cache_delete( self::LOCK_OPTION, 'options' );
+		self::$lock = null;
+	}
+
+	/**
+	 * Vrai tant que le passage peut continuer : verrou encore détenu et budget de temps non épuisé.
+	 *
+	 * @return bool
+	 */
+	public static function can_continue() {
+		if ( ! self::$lock ) {
+			// Appel direct hors du traitement récurrent (tests, outils) : pas de verrou à surveiller.
+			return true;
+		}
+		/**
+		 * Filtre le budget de temps d'un passage, en secondes (par défaut : la moitié de la durée du verrou).
+		 *
+		 * @param int $budget Secondes.
+		 */
+		$budget = (int) apply_filters( 'oli_acr_time_budget', (int) floor( self::lock_ttl() / 2 ) );
+		if ( self::$started && time() - self::$started >= $budget ) {
+			return false;
+		}
+		return self::renew_lock();
+	}
+
+	/**
+	 * Traitement récurrent, protégé contre les passages simultanés.
 	 *
 	 * @return void
 	 */
 	public static function process() {
-		if ( get_transient( 'oli_acr_lock' ) ) {
+		if ( ! self::acquire_lock() ) {
 			return;
 		}
-		set_transient( 'oli_acr_lock', 1, 5 * MINUTE_IN_SECONDS );
-
-		if ( 'yes' === oli_acr_get_setting( 'enabled' ) ) {
-			self::mark_abandoned();
-			self::send_due_carts();
+		self::$started = time();
+		try {
+			if ( 'yes' === oli_acr_get_setting( 'enabled' ) ) {
+				self::mark_abandoned();
+				self::send_due_carts();
+			}
+			if ( 'yes' === oli_acr_get_setting( 'pending_enabled' ) && self::can_continue() ) {
+				self::send_due_orders();
+			}
+		} finally {
+			self::release_lock();
+			self::$started = 0;
 		}
-		if ( 'yes' === oli_acr_get_setting( 'pending_enabled' ) ) {
-			self::send_due_orders();
-		}
+	}
 
-		delete_transient( 'oli_acr_lock' );
+	/**
+	 * Délais entre les nouveaux essais après un échec d'envoi (secondes). Un essai par délai.
+	 *
+	 * @return int[]
+	 */
+	public static function retry_delays() {
+		/**
+		 * Filtre les délais des nouveaux essais après un échec d'envoi (5 min, 30 min, 2 h par défaut).
+		 *
+		 * @param int[] $delays Secondes.
+		 */
+		$delays = (array) apply_filters( 'oli_acr_retry_delays', array( 5 * MINUTE_IN_SECONDS, 30 * MINUTE_IN_SECONDS, 2 * HOUR_IN_SECONDS ) );
+		return array_values( array_filter( array_map( 'absint', $delays ) ) );
+	}
+
+	/**
+	 * Échec d'envoi d'une relance de panier : statut « failed », nouvel essai plus tard ou abandon définitif.
+	 *
+	 * @param object $cart   Panier.
+	 * @param string $tpl_id Modèle.
+	 * @return string|null Prochain essai (UTC) ou null.
+	 */
+	public static function cart_failed( $cart, $tpl_id ) {
+		$count  = (int) ( isset( $cart->fail_count ) ? $cart->fail_count : 0 ) + 1;
+		$delays = self::retry_delays();
+		$next   = isset( $delays[ $count - 1 ] ) ? gmdate( 'Y-m-d H:i:s', time() + $delays[ $count - 1 ] ) : null;
+		$error  = OLI_ACR_Mailer::last_error();
+		OLI_ACR_Carts::update(
+			$cart->id,
+			array(
+				'status'       => 'failed',
+				'fail_count'   => $count,
+				'last_error'   => substr( $error, 0, 1000 ),
+				'next_send_at' => $next,
+			)
+		);
+		oli_acr_log_error(
+			sprintf(
+				/* translators: 1: cart ID, 2: template ID, 3: attempt number, 4: error message, 5: next attempt or "none". */
+				__( 'Reminder for cart #%1$d (template %2$s) could not be sent, attempt %3$d: %4$s. Next attempt: %5$s.', 'oli-abandoned-cart-recovery' ),
+				(int) $cart->id,
+				$tpl_id,
+				$count,
+				$error,
+				$next ? $next . ' UTC' : __( 'none (gave up)', 'oli-abandoned-cart-recovery' )
+			)
+		);
+		oli_acr_record_failure( $error );
+		return $next;
 	}
 
 	/**
@@ -154,10 +335,19 @@ class OLI_ACR_Scheduler {
 		$table = oli_acr_table( 'carts' );
 		$now   = oli_acr_now();
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table() ou $wpdb->prefix avec un suffixe fixe, jamais une saisie.
-		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE status IN ('abandoned','reminded') AND next_send_at IS NOT NULL AND next_send_at <= %s ORDER BY next_send_at ASC LIMIT %d", $now, self::batch_size() ) );
+		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE status IN ('abandoned','reminded','failed') AND next_send_at IS NOT NULL AND next_send_at <= %s ORDER BY next_send_at ASC LIMIT %d", $now, self::batch_size() ) );
 		$sent = 0;
 
 		foreach ( (array) $rows as $cart ) {
+			if ( ! self::can_continue() ) {
+				break;
+			}
+			// Réclame le panier : un autre passage ne peut plus le relire pendant l'envoi (R4).
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table(), jamais une saisie.
+			$claimed = (int) $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET next_send_at = %s WHERE id = %d AND next_send_at = %s", oli_acr_now( self::lock_ttl() ), (int) $cart->id, (string) $cart->next_send_at ) );
+			if ( ! $claimed ) {
+				continue;
+			}
 			if ( ! self::cart_owner_tracked( $cart ) || oli_acr_is_unsubscribed( $cart->email ) ) {
 				OLI_ACR_Carts::update( $cart->id, array( 'next_send_at' => null ) );
 				continue;
@@ -179,10 +369,11 @@ class OLI_ACR_Scheduler {
 				$done[]    = $next['id'];
 				$following = self::next_template( $templates, $done );
 				$next_at   = $following ? gmdate( 'Y-m-d H:i:s', max( time() + 60, $base + oli_acr_duration_to_seconds( $following['delay'] ) ) ) : null;
+				OLI_ACR_Carts::update( $cart->id, array( 'next_send_at' => $next_at ) );
 			} else {
-				$next_at = null;
+				// R1 : nouvel essai avec un délai croissant, puis abandon définitif (statut « failed »).
+				self::cart_failed( $cart, $next['id'] );
 			}
-			OLI_ACR_Carts::update( $cart->id, array( 'next_send_at' => $next_at ) );
 		}
 		return $sent;
 	}
@@ -210,8 +401,17 @@ class OLI_ACR_Scheduler {
 	 * @param object $cart Panier.
 	 * @return bool
 	 */
-	private static function cart_owner_tracked( $cart ) {
-		return oli_acr_user_is_tracked( (int) $cart->user_id );
+	public static function cart_owner_tracked( $cart ) {
+		$user_id = (int) $cart->user_id;
+		if ( ! oli_acr_user_is_tracked( $user_id ) ) {
+			return false;
+		}
+		// Consentement requis : invité, case cochée (colonne consent) ; client connecté, consentement mémorisé (R10).
+		// Les paniers de clients connectés captés sans case avant la 1.1.0 ne sont donc plus relancés.
+		if ( oli_acr_consent_required() ) {
+			return $user_id ? oli_acr_user_has_consent( $user_id ) && (int) $cart->consent : (bool) (int) $cart->consent;
+		}
+		return true;
 	}
 
 	/**
@@ -226,22 +426,23 @@ class OLI_ACR_Scheduler {
 		}
 		$base_delay = oli_acr_duration_to_seconds( oli_acr_get_setting( 'pending_after' ) );
 		$orders     = wc_get_orders(
-			array(
-				'status'       => 'pending',
-				'limit'        => self::batch_size(),
-				'orderby'      => 'date',
-				'order'        => 'ASC',
-				'date_created' => '<' . ( time() - $base_delay ),
-				'meta_query'   => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Requête bornée par statut, date et limite.
-					array(
-						'key'     => '_oli_acr_done',
-						'compare' => 'NOT EXISTS',
-					),
+			self::orders_query(
+				array(
+					'status'       => 'pending',
+					'limit'        => self::batch_size(),
+					'orderby'      => 'date',
+					'order'        => 'ASC',
+					'date_created' => '<' . ( time() - $base_delay ),
 				),
+				'_oli_acr_done',
+				'NOT EXISTS'
 			)
 		);
 		$sent       = 0;
 		foreach ( $orders as $order ) {
+			if ( ! self::can_continue() ) {
+				break;
+			}
 			/**
 			 * Filtre les canaux de création de commande suivis.
 			 *
@@ -271,11 +472,105 @@ class OLI_ACR_Scheduler {
 			if ( $last && ( time() - $last ) < self::interval() - 5 ) {
 				continue;
 			}
+			// Nouvel essai après un échec : on attend la fin du délai.
+			$retry_at = (int) $order->get_meta( '_oli_acr_retry_at' );
+			if ( $retry_at && $retry_at > time() ) {
+				continue;
+			}
 			if ( OLI_ACR_Mailer::send_order_email( $order, $next['id'], $next ) ) {
 				++$sent;
+				if ( $order->get_meta( '_oli_acr_fail_count' ) ) {
+					$order->delete_meta_data( '_oli_acr_fail_count' );
+					$order->delete_meta_data( '_oli_acr_retry_at' );
+					$order->save();
+				}
+			} else {
+				self::order_failed( $order, $next['id'] );
 			}
 		}
 		return $sent;
+	}
+
+	/**
+	 * Échec d'envoi d'une relance de commande : nouvel essai plus tard, puis abandon (« _oli_acr_done »).
+	 *
+	 * @param WC_Order $order  Commande.
+	 * @param string   $tpl_id Modèle.
+	 * @return void
+	 */
+	public static function order_failed( $order, $tpl_id ) {
+		$count  = (int) $order->get_meta( '_oli_acr_fail_count' ) + 1;
+		$delays = self::retry_delays();
+		$error  = OLI_ACR_Mailer::last_error();
+		$order->update_meta_data( '_oli_acr_fail_count', $count );
+		if ( isset( $delays[ $count - 1 ] ) ) {
+			$next = time() + $delays[ $count - 1 ];
+			$order->update_meta_data( '_oli_acr_retry_at', $next );
+		} else {
+			$next = 0;
+			$order->delete_meta_data( '_oli_acr_retry_at' );
+			$order->update_meta_data( '_oli_acr_done', 1 );
+		}
+		$order->save();
+		oli_acr_log_error(
+			sprintf(
+				/* translators: 1: order ID, 2: template ID, 3: attempt number, 4: error message, 5: next attempt or "none". */
+				__( 'Reminder for pending order #%1$d (template %2$s) could not be sent, attempt %3$d: %4$s. Next attempt: %5$s.', 'oli-abandoned-cart-recovery' ),
+				$order->get_id(),
+				$tpl_id,
+				$count,
+				$error,
+				$next ? gmdate( 'Y-m-d H:i:s', $next ) . ' UTC' : __( 'none (gave up)', 'oli-abandoned-cart-recovery' )
+			)
+		);
+		oli_acr_record_failure( $error );
+	}
+
+	/**
+	 * Arguments de wc_get_orders() avec une condition sur une méta, compatibles HPOS et stockage par articles.
+	 *
+	 * @param array<string, mixed> $args    Arguments.
+	 * @param string               $key     Clé de méta.
+	 * @param string               $compare EXISTS ou NOT EXISTS.
+	 * @return array<string, mixed>
+	 */
+	public static function orders_query( $args, $key, $compare ) {
+		$clause = array(
+			'key'     => $key,
+			'compare' => $compare,
+		);
+		if ( self::hpos_enabled() ) {
+			$args['meta_query'] = array( $clause ); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Requête bornée par statut, date et limite.
+		} else {
+			// Variable maison, traduite en meta_query WP_Query par cpt_orders_query() (R3).
+			$args['oli_acr_meta'] = $clause;
+		}
+		return $args;
+	}
+
+	/**
+	 * Stockage des commandes HPOS actif ?
+	 *
+	 * @return bool
+	 */
+	public static function hpos_enabled() {
+		return class_exists( '\Automattic\WooCommerce\Utilities\OrderUtil' ) && \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled();
+	}
+
+	/**
+	 * Sans HPOS : ajoute la condition « oli_acr_meta » à la requête WP_Query des commandes.
+	 *
+	 * @param array<string, mixed> $query      Arguments WP_Query.
+	 * @param array<string, mixed> $query_vars Variables de wc_get_orders().
+	 * @return array<string, mixed>
+	 */
+	public static function cpt_orders_query( $query, $query_vars ) {
+		if ( ! empty( $query_vars['oli_acr_meta'] ) && is_array( $query_vars['oli_acr_meta'] ) ) {
+			$meta                = isset( $query['meta_query'] ) && is_array( $query['meta_query'] ) ? $query['meta_query'] : array();
+			$meta[]              = $query_vars['oli_acr_meta'];
+			$query['meta_query'] = $meta; // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Requête bornée par statut, date et limite.
+		}
+		return $query;
 	}
 
 	/**
@@ -303,7 +598,7 @@ class OLI_ACR_Scheduler {
 		$after = oli_acr_duration_to_seconds( oli_acr_get_setting( 'delete_carts_after' ) );
 		if ( $after > 0 ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table() ou $wpdb->prefix avec un suffixe fixe, jamais une saisie.
-			$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM {$carts} WHERE status IN ('open','abandoned','reminded') AND updated_at <= %s LIMIT 1000", oli_acr_now( -1 * $after ) ) );
+			$ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM {$carts} WHERE status IN ('open','abandoned','reminded','failed') AND updated_at <= %s LIMIT 1000", oli_acr_now( -1 * $after ) ) );
 			foreach ( $ids as $id ) {
 				OLI_ACR_Carts::delete( $id );
 				++$deleted;
@@ -332,16 +627,14 @@ class OLI_ACR_Scheduler {
 			return 0;
 		}
 		$orders = wc_get_orders(
-			array(
-				'status'       => 'pending',
-				'limit'        => 100,
-				'date_created' => '<' . ( time() - $after ),
-				'meta_query'   => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Requête bornée par statut, date et limite.
-					array(
-						'key'     => '_oli_acr_sent',
-						'compare' => 'EXISTS',
-					),
+			self::orders_query(
+				array(
+					'status'       => 'pending',
+					'limit'        => 100,
+					'date_created' => '<' . ( time() - $after ),
 				),
+				'_oli_acr_sent',
+				'EXISTS'
 			)
 		);
 		foreach ( $orders as $order ) {
