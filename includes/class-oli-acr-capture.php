@@ -328,7 +328,7 @@ class OLI_ACR_Capture {
 			return;
 		}
 		// Consentement requis : un client connecté n'est suivi qu'après avoir coché la case (R10).
-		if ( $user_id && ! $cart_id && oli_acr_consent_required() && ! oli_acr_user_has_consent( $user_id ) ) {
+		if ( $user_id && oli_acr_consent_required() && ! oli_acr_user_has_consent( $user_id ) ) {
 			return;
 		}
 

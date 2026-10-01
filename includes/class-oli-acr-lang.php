@@ -261,13 +261,21 @@ class OLI_ACR_Lang {
 	 * @return mixed
 	 */
 	public static function run_in( $locale, $callback, ...$args ) {
-		$adapter  = self::adapter();
-		$previous = $adapter->switch_language( $locale );
-		try {
-			return oli_acr_in_locale( $locale, $callback, ...$args );
-		} finally {
-			$adapter->restore_language( $previous );
-		}
+		$adapter = self::adapter();
+		// D'abord la locale WordPress (rechargement des traductions), puis la langue de l'extension :
+		// certaines extensions (TranslatePress) filtrent la locale d'après leur langue courante, ce qui
+		// empêcherait switch_to_locale() de recharger les traductions si l'ordre était inversé (WP-CLI).
+		return oli_acr_in_locale(
+			$locale,
+			static function () use ( $adapter, $locale, $callback, $args ) {
+				$previous = $adapter->switch_language( $locale );
+				try {
+					return call_user_func_array( $callback, $args );
+				} finally {
+					$adapter->restore_language( $previous );
+				}
+			}
+		);
 	}
 
 	/**
