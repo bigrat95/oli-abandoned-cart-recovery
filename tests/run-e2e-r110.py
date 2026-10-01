@@ -251,9 +251,16 @@ def t_r4():
     php('add_filter("oli_acr_time_budget", function() { return 1; }); do_action("oli_acr_process");')
     opt('oli_acr_test_mail_sleep', None)
     n1 = sql("SELECT COUNT(*) FROM wp_oli_acr_carts WHERE emails_sent = 1")[0][0]
-    php('do_action("oli_acr_process");')
-    n2 = sql("SELECT COUNT(*) FROM wp_oli_acr_carts WHERE emails_sent = 1")[0][0]
-    result('(R4) Budget de temps : le passage s\'arrête avant l\'expiration du verrou, le suivant termine', n1 in ('1', '2') and n2 == '3', f'1er={n1} 2e={n2}')
+    # Le passage suivant peut être celui du planificateur réel (WP-Cron/Action Scheduler déclenché par le trafic
+    # des tests précédents) : s'il détient le verrou, notre passage s'arrête, on attend qu'il termine.
+    for _ in range(6):
+        php('do_action("oli_acr_process");')
+        n2 = sql("SELECT COUNT(*) FROM wp_oli_acr_carts WHERE emails_sent = 1")[0][0]
+        if n2 == '3':
+            break
+        time.sleep(2)
+    states = sql("SELECT id, status, emails_sent, fail_count, IFNULL(last_error,''), IFNULL(next_send_at,'NULL'), UTC_TIMESTAMP() FROM wp_oli_acr_carts WHERE email LIKE 'r4-budget-%' ORDER BY id")
+    result('(R4) Budget de temps : le passage s\'arrête avant l\'expiration du verrou, le suivant termine', n1 in ('1', '2') and n2 == '3', f'1er={n1} 2e={n2} {states}')
     old = php('echo get_transient("oli_acr_lock") === false ? "absent" : "présent";')
     result('(R4) Ancien transient « oli_acr_lock » plus utilisé', old == 'absent' and 'oli_acr_lock\'' not in open(os.path.join(ROOT, 'includes/class-oli-acr-scheduler.php')).read(), old)
 
@@ -471,6 +478,15 @@ def t_r10():
     n2 = sql(f"SELECT COUNT(*) FROM wp_oli_acr_carts WHERE email='{ge2}'")[0][0]
     result('(R10) Interrupteur OFF : client connecté suivi sans case, invité capté sans case, aucune case affichée',
            r4[0] == '1' and n2 == '1' and str(cfg3.get('consent')) == '0' and 'id="oli_acr_consent"' not in html3, f'connecté={r4} invité={n2} cfg={cfg3.get("consent")}')
+    # Interrupteur OFF : relances envoyées sans consentement, au client connecté (sans méta) comme à l'invité.
+    php('delete_user_meta(2, "_oli_acr_consent");')
+    mp_clear()
+    cid_u = due_cart('cliente@example.com', user_id=2, consent=0)
+    cid_g = due_cart(f'r10-g3-{STAMP}@example.test', consent=0)
+    php('do_action("oli_acr_process");')
+    result('(R10) Interrupteur OFF : relance envoyée au client connecté sans consentement mémorisé et à l\'invité sans case',
+           cart(cid_u)[1] == '1' and cart(cid_g)[1] == '1' and len(mails_to('cliente@example.com')) == 1 and len(mails_to(f'r10-g3-{STAMP}@example.test')) == 1,
+           f'connecté={cart(cid_u)} invité={cart(cid_g)}')
     reset('consent')
 
 TESTS = {'r1': t_r1, 'r2': t_r2, 'r3': t_r3, 'r4': t_r4, 'r5': t_r5, 'r6': t_r6, 'r7': t_r7, 'r8': t_r8, 'r9': t_r9, 'consent': t_consent, 'r10': t_r10}

@@ -1,23 +1,23 @@
 classic capture requests: 1
 blocks capture requests: 1 
-PASS - (a) Checkout classique : courriel capturé (visiteur non connecté, sans commande) - ['classique15376@example.com', 'open', '4385550199', '2', '55.0000', 'CAD', '0']
-PASS - (b) Checkout en blocs : courriel capturé - ['blocs15376@example.com', 'open', '4385550199', '2', '55.0000', 'CAD', '0']
+PASS - (a) Checkout classique : courriel capturé (visiteur non connecté, sans commande) - ['classique17371@example.com', 'open', '4385550199', '2', '55.0000', 'CAD', '0']
+PASS - (b) Checkout en blocs : courriel capturé - ['blocs17371@example.com', 'open', '4385550199', '2', '55.0000', 'CAD', '0']
 PASS - (+) Téléphone capturé (classique et blocs) - 4385550199 / 4385550199
 PASS - (+) Flux AJAX (curl) : capture acceptée - {"success":true,"data":{"captured":true}}
    … attente 61 s (délai réel)
-PASS - (c) Statut « relancé » après envoi - {'classique15376@example.com': 'reminded', 'blocs15376@example.com': 'reminded', 'desabo15376@example.com': 'reminded'}
-PASS - (c) Relance #1 reçue dans Mailpit après le délai, liens fonctionnels - classique15376@example.com:1 blocs15376@example.com:1 desabo15376@example.com:1 recover=302 unsub=200
-PASS - (d) Lien de récupération : panier + courriel remis, redirection au checkout - http://localhost:8898/checkout/ [('Foulard', 1), ('Tuque en laine', 1)] classique15376@example.com
+PASS - (c) Statut « relancé » après envoi - {'classique17371@example.com': 'reminded', 'blocs17371@example.com': 'reminded', 'desabo17371@example.com': 'reminded'}
+PASS - (c) Relance #1 reçue dans Mailpit après le délai, liens fonctionnels - classique17371@example.com:1 blocs17371@example.com:1 desabo17371@example.com:1 recover=302 unsub=200
+PASS - (d) Lien de récupération : panier + courriel remis, redirection au checkout - http://localhost:8898/checkout/ [('Foulard', 1), ('Tuque en laine', 1)] classique17371@example.com
    … attente 61 s (délai réel)
 PASS - (e) Désabonnement : liste d'exclusion + statut « désabonné » + aucun envoi ensuite - status=unsubscribed emails=1 recapture={"success":false,"data":{"reason":"unsubscribed"}}
-PASS - (f) Commande passée → panier « récupéré », relié à la commande, relance #2 annulée - order=260 row=[['recovered', '260', 'email', 'NULL']] relances_recues=1
-PASS - (+) Avis à l'admin quand un panier est récupéré - [Boutique test] Vente récupérée : commande nº 260
-PASS - (+) Plusieurs modèles en séquence (#1 puis #2 avec coupon unique) - ['Un petit quelque chose pour terminer votre commande', 'Vous avez oublié quelque chose dans votre panier'] coupon=OLI-GFUY1SXG id=261
-PASS - (+) Coupon appliqué au retour, utilisé dans la commande puis nettoyé (corbeille) - appliqué=['oli-gfuy1sxg'] commande=262 statut_coupon=trash
-PASS - (+) Journal : clic et récupération attribués à la relance #2 - [['1', '262']]
-PASS - (+) Coupon expiré nettoyé - 263
-PASS - (+) Commande en attente : relance envoyée, lien de paiement, récupérée au paiement + avis admin - order=264 mails=1 pay=302 http://localhost:8898/checkout/order-pay/264/?pay_for_order= meta=order admin=1
-PASS - (+) Nettoyage : commande en attente relancée trop vieille annulée - 265
+PASS - (f) Commande passée → panier « récupéré », relié à la commande, relance #2 annulée - order=365 row=[['recovered', '365', 'email', 'NULL']] relances_recues=1
+PASS - (+) Avis à l'admin quand un panier est récupéré - [Boutique test] Vente récupérée : commande nº 365
+PASS - (+) Plusieurs modèles en séquence (#1 puis #2 avec coupon unique) - ['Un petit quelque chose pour terminer votre commande', 'Vous avez oublié quelque chose dans votre panier'] coupon=OLI-IRBNEJVV id=366
+PASS - (+) Coupon appliqué au retour, utilisé dans la commande puis nettoyé (corbeille) - appliqué=['oli-irbnejvv'] commande=367 statut_coupon=trash
+PASS - (+) Journal : clic et récupération attribués à la relance #2 - [['1', '367']]
+PASS - (+) Coupon expiré nettoyé - 368
+PASS - (+) Commande en attente : relance envoyée, lien de paiement, récupérée au paiement + avis admin - order=369 mails=1 pay=302 http://localhost:8898/checkout/order-pay/369/?pay_for_order= meta=order admin=1
+PASS - (+) Nettoyage : commande en attente relancée trop vieille annulée - 370
 PASS - (+) Nettoyage automatique des paniers de plus de 30 jours - 1 → 0
 PASS - (+) Consentement : case affichée, rien sans consentement, capture avec consentement - sans={"success":false,"data":{"reason":"no_consent"}} avec={"success":true,"data":{"captured":true}}
 PASS - (+) Client connecté : panier capturé à l'ajout au panier - [['open', '1', 'Julie']]
@@ -31,13 +31,13 @@ PASS - (+) Rapports : envoyés, clics, récupérés et montant - {"abandoned": 2
 PASS - (B1) Envoi manuel : refusé pour un panier récupéré, nonce lié au panier, suite de la séquence planifiée - recupere=arts&oli_acr_msg=not_sent statut=recovered mauvais_nonce=403 actif=rts&oli_acr_msg=sent ['reminded', '1'] liens_envoi=[]
 PASS - (B3) Texte de consentement par défaut : suit la langue, champ vide dans les réglages - affiché='Enregistrer mon courriel et mon panier pour que la boutique puisse me rappeler ma commande.' autre='Save my email and cart so the store can remind me about my order.' textarea=''
 PASS - (B4) Relance dans la langue du panier (en_US) : sujet, bouton et pied de page - sujet='You left something in your cart' bouton='Complete my order' pied='Unsubscribe' locale_site_apres=fr_CA
-PASS - (B5) List-Unsubscribe + List-Unsubscribe-Post (RFC 8058) et POST en un clic - LU=<http://localhost:8898/?oli_acr_unsub=langue15376%40example. LUP=List-Unsubscribe=One-Click post=200 statut=unsubscribed
+PASS - (B5) List-Unsubscribe + List-Unsubscribe-Post (RFC 8058) et POST en un clic - LU=<http://localhost:8898/?oli_acr_unsub=langue17371%40example. LUP=List-Unsubscribe=One-Click post=200 statut=unsubscribed
 PASS - (B6) Courriel : colonne d'image vide retirée, bordure du coupon à la couleur WooCommerce - couleur=#111111 images_produits=1 td_image=True
 PASS - (B7) Colonne Client : courriel sans coupure (paniers et récupérés) - css_nowrap=True
 PASS - (B8) Courriel test : lien de désabonnement factice, aucun en-tête List-Unsubscribe, aucune exclusion - lien_reel=False entete=False
 PASS - (Loi 25) Défaut « avec consentement » : sans case cochée, rien n'est transmis ni enregistré - défaut=consent navigateur="classic capture requests: 0" lignes=0 ajax={"success":false,"data":{"reason":"no_consent"}} avec_consentement=1
-PASS - (N2) Désinstallation : « _wc_other/oli-acr/consent » retiré des sessions WooCommerce (sérialisées), le reste intact - restant=0 session=n2-15376@example.com|[{"key":"_wc_other\/autre\/champ","value":"garde"}]
-FAIL - (B2) Désinstallation : option « garder les données », puis aucun résidu (sauf coupons utilisés, documenté) - garder=['2', '1'] avant: logs_AS=13 fichiers=1 après={'tables': '0', 'options': '1', 'as_actions': '0', 'as_logs': '0', 'as_group': '0', 'wc_logs': '0', 'order_meta': '0', 'post_meta': '0', 'user_meta': '0', 'sessions': '0', 'sessions_consent_n2': '0', 'cap': '0', 'unused_coupon': '0', 'used_coupon_kept': '1'}
+PASS - (N2) Désinstallation : « _wc_other/oli-acr/consent » retiré des sessions WooCommerce (sérialisées), le reste intact - restant=0 session=n2-17371@example.com|[{"key":"_wc_other\/autre\/champ","value":"garde"}]
+PASS - (B2) Désinstallation : option « garder les données », puis aucun résidu (sauf coupons utilisés, documenté) - garder=['2', '1'] avant: logs_AS=10 fichiers=1 après={'tables': '0', 'options': '0', 'as_actions': '0', 'as_logs': '0', 'as_group': '0', 'wc_logs': '0', 'order_meta': '0', 'post_meta': '0', 'user_meta': '0', 'sessions': '0', 'sessions_consent_n2': '0', 'cap': '0', 'unused_coupon': '0', 'used_coupon_kept': '1'}
 
 ==== RÉSUMÉ ====
 PASS (a) Checkout classique : courriel capturé (visiteur non connecté, sans commande)
@@ -75,4 +75,4 @@ PASS (B7) Colonne Client : courriel sans coupure (paniers et récupérés)
 PASS (B8) Courriel test : lien de désabonnement factice, aucun en-tête List-Unsubscribe, aucune exclusion
 PASS (Loi 25) Défaut « avec consentement » : sans case cochée, rien n'est transmis ni enregistré
 PASS (N2) Désinstallation : « _wc_other/oli-acr/consent » retiré des sessions WooCommerce (sérialisées), le reste intact
-FAIL (B2) Désinstallation : option « garder les données », puis aucun résidu (sauf coupons utilisés, documenté)
+PASS (B2) Désinstallation : option « garder les données », puis aucun résidu (sauf coupons utilisés, documenté)
