@@ -107,7 +107,7 @@ def t_r1():
     ok1 = c1 and c1[0] == 'failed' and c1[2] == '1' and c1[3] != '' and 240 <= int(c1[5] or 0) <= 330
     result('(R1) Échec SMTP : statut « failed », cause enregistrée, nouvel essai dans 5 min (et non NULL)', ok1, f'carts={c1}')
     result('(R1) Échec journalisé au niveau ERROR dans les journaux WooCommerce, sans WP_DEBUG, avec la cause',
-           'ERROR' in log and f'#{cid}' in log and ('Connection refused' in log or 'connect' in log.lower()), log[-400:])
+           'ERROR' in log and (f'#{cid} ' in log or f'nº {cid} ' in log or f'n° {cid} ' in log) and ('Connection refused' in log or 'connect' in log.lower()), log[-400:])
     result('(R1) Échec visible dans l\'admin : avis général + statut et cause dans la liste des paniers (filtre « failed »)',
            'oli-acr-mail-failure' in notice and email in table and 'oli-acr-status-failed' in table and (c1[3][:20] in table if c1 else False), f'notice={"oli-acr-mail-failure" in notice} table={email in table}')
     result('(R1) Aucun coupon orphelin ni ligne de journal laissés par l\'envoi raté', logrows == '0' and coupons == '0', f'log={logrows} coupons={coupons}')

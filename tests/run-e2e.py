@@ -353,7 +353,8 @@ def main():
     process()
     m4 = mails_to(E_B4)
     m4full = mail_get(m4[0]['ID']) if m4 else {'HTML': '', 'Subject': ''}
-    btn_other = php('echo oli_acr_in_locale("' + OTHER + '", function(){ $t = OLI_ACR_Templates::default_templates(); return $t["tpl_cart_1"]["button_label"]; });')
+    # Bouton attendu : celui du modèle résolu dans la langue du panier (avec ou sans extension multilingue).
+    btn_other = php('$t = OLI_ACR_Templates::for_locale("tpl_cart_1", OLI_ACR_Templates::get("tpl_cart_1"), "' + OTHER + '"); echo "" !== $t["button_label"] ? $t["button_label"] : oli_acr_in_locale("' + OTHER + '", function(){ return __("Complete my order", "oli-abandoned-cart-recovery"); });')
     foot_other = php('echo oli_acr_in_locale("' + OTHER + '", function(){ return __("Unsubscribe", "oli-abandoned-cart-recovery"); });')
     after_locale = php('echo determine_locale();')
     result('(B4) Relance dans la langue du panier (' + OTHER + ') : sujet, bouton et pied de page',
@@ -436,7 +437,8 @@ def main():
     ids = ','.join(as_ids) or '0'
     res = {
         'tables': q("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name LIKE 'wp_oli_acr_%'"),
-        'options': q("SELECT COUNT(*) FROM wp_options WHERE option_name LIKE 'oli_acr_%' OR option_name LIKE '%oli_acr_admin_recovered%' OR option_name LIKE '_transient_oli_acr_%'"),
+        # Options du MU plugin de test (oli_acr_test_*, oli_acr_stub_*) exclues : elles n'appartiennent pas à l'extension.
+        'options': q("SELECT COUNT(*) FROM wp_options WHERE (option_name LIKE 'oli_acr_%' OR option_name LIKE '%oli_acr_admin_recovered%' OR option_name LIKE '_transient_oli_acr_%') AND option_name NOT LIKE 'oli\\_acr\\_test\\_%' AND option_name NOT LIKE 'oli\\_acr\\_stub\\_%'"),
         'as_actions': q("SELECT COUNT(*) FROM wp_actionscheduler_actions WHERE hook LIKE 'oli_acr_%'"),
         'as_logs': q(f"SELECT COUNT(*) FROM wp_actionscheduler_logs WHERE action_id IN ({ids})"),
         'as_group': q("SELECT COUNT(*) FROM wp_actionscheduler_groups WHERE slug = 'oli-abandoned-cart-recovery'"),
