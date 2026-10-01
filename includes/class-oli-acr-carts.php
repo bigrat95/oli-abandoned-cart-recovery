@@ -15,11 +15,18 @@ defined( 'ABSPATH' ) || exit;
 class OLI_ACR_Carts {
 
 	/**
-	 * Statuts pour lesquels le panier est encore « vivant ».
+	 * Méta utilisateur : consentement donné par un client connecté (horodatage).
+	 *
+	 * @var string
+	 */
+	const USER_CONSENT_META = '_oli_acr_consent';
+
+	/**
+	 * Statuts d'un panier encore suivi.
 	 *
 	 * @var string[]
 	 */
-	const LIVE_STATUSES = array( 'open', 'abandoned', 'reminded' );
+	const LIVE_STATUSES = array( 'open', 'abandoned', 'reminded', 'failed' );
 
 	/**
 	 * Clé de session WooCommerce qui garde l'ID du panier suivi.
@@ -66,7 +73,7 @@ class OLI_ACR_Carts {
 		global $wpdb;
 		$table = oli_acr_table( 'carts' );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table() ou $wpdb->prefix avec un suffixe fixe, jamais une saisie.
-		return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE email = %s AND status IN ('open','abandoned','reminded') ORDER BY id DESC LIMIT 1", strtolower( $email ) ) );
+		return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE email = %s AND status IN ('open','abandoned','reminded','failed') ORDER BY id DESC LIMIT 1", strtolower( $email ) ) );
 	}
 
 	/**
@@ -82,7 +89,7 @@ class OLI_ACR_Carts {
 		}
 		$table = oli_acr_table( 'carts' );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table() ou $wpdb->prefix avec un suffixe fixe, jamais une saisie.
-		return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE session_key = %s AND status IN ('open','abandoned','reminded') ORDER BY id DESC LIMIT 1", (string) $session_key ) );
+		return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE session_key = %s AND status IN ('open','abandoned','reminded','failed') ORDER BY id DESC LIMIT 1", (string) $session_key ) );
 	}
 
 	/**
@@ -283,7 +290,7 @@ class OLI_ACR_Carts {
 		global $wpdb;
 		$table = oli_acr_table( 'carts' );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table() ou $wpdb->prefix avec un suffixe fixe, jamais une saisie.
-		$wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status = 'unsubscribed', next_send_at = NULL WHERE email = %s AND status IN ('open','abandoned','reminded')", strtolower( $email ) ) );
+		$wpdb->query( $wpdb->prepare( "UPDATE {$table} SET status = 'unsubscribed', next_send_at = NULL WHERE email = %s AND status IN ('open','abandoned','reminded','failed')", strtolower( $email ) ) );
 	}
 
 	/**

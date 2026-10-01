@@ -25,7 +25,7 @@ class OLI_ACR_Install {
 		self::create_tables();
 		self::add_caps();
 		if ( false === get_option( 'oli_acr_settings' ) ) {
-			add_option( 'oli_acr_settings', oli_acr_default_settings(), '', false );
+			add_option( 'oli_acr_settings', oli_acr_default_settings(), '', true );
 		}
 		if ( false === get_option( 'oli_acr_templates' ) ) {
 			add_option( 'oli_acr_templates', OLI_ACR_Templates::default_templates(), '', false );
@@ -65,7 +65,7 @@ class OLI_ACR_Install {
 		$signature = md5( implode( ',', OLI_ACR_Lang::languages() ) . '|' . OLI_ACR_Lang::adapter()->id() );
 		if ( get_option( 'oli_acr_languages_signature' ) !== $signature ) {
 			OLI_ACR_Templates::sync_languages();
-			update_option( 'oli_acr_languages_signature', $signature, false );
+			update_option( 'oli_acr_languages_signature', $signature, true );
 		}
 	}
 
@@ -80,8 +80,14 @@ class OLI_ACR_Install {
 	 * @return void
 	 */
 	public static function migrate() {
+		$from     = (string) get_option( 'oli_acr_version', '' );
 		$settings = get_option( 'oli_acr_settings' );
 		if ( is_array( $settings ) ) {
+			// R2 (Loi 25, RGPD) : une installation 1.0.x en mode « toujours » repasse au consentement (interrupteur activé).
+			if ( ( '' === $from || version_compare( $from, '1.1.0', '<' ) ) && isset( $settings['guest_tracking'] ) && 'always' === $settings['guest_tracking'] ) {
+				$settings['guest_tracking'] = 'consent';
+				update_option( 'oli_acr_notice_consent_migrated', time(), true );
+			}
 			$texts    = isset( $settings['consent_texts'] ) && is_array( $settings['consent_texts'] ) ? $settings['consent_texts'] : array();
 			$fallback = OLI_ACR_Lang::fallback_language();
 			$legacy   = isset( $settings['consent_text'] ) ? (string) $settings['consent_text'] : '';
@@ -92,10 +98,26 @@ class OLI_ACR_Install {
 			if ( ! isset( $settings['fallback_language'] ) ) {
 				$settings['fallback_language'] = '';
 			}
-			update_option( 'oli_acr_settings', $settings, false );
+			update_option( 'oli_acr_settings', $settings, true );
 		}
 		OLI_ACR_Templates::sync_languages();
-		update_option( 'oli_acr_version', OLI_ACR_VERSION, false );
+		update_option( 'oli_acr_version', OLI_ACR_VERSION, true );
+		// R8 : options lues à chaque page, chargées d'avance (les installations 1.0.x les avaient en autoload=off).
+		wp_set_option_autoload_values(
+			array(
+				'oli_acr_settings'            => true,
+				'oli_acr_db_version'          => true,
+				'oli_acr_version'             => true,
+				'oli_acr_languages_signature' => true,
+				'oli_acr_schedule_signature'  => true,
+			)
+		);
+		// Réglages de l'avis « vente récupérée » (WC_Email) : WooCommerce les lit sur les pages qui chargent les courriels.
+		if ( false === get_option( 'woocommerce_oli_acr_admin_recovered_settings' ) ) {
+			add_option( 'woocommerce_oli_acr_admin_recovered_settings', array(), '', true );
+		}
+		// Ancien verrou (transient) remplacé par le verrou atomique « oli_acr_process_lock ».
+		delete_transient( 'oli_acr_lock' );
 	}
 
 	/**
@@ -129,6 +151,8 @@ class OLI_ACR_Install {
   status varchar(20) NOT NULL DEFAULT 'open',
   consent tinyint(1) NOT NULL DEFAULT 0,
   emails_sent smallint(5) unsigned NOT NULL DEFAULT 0,
+  fail_count smallint(5) unsigned NOT NULL DEFAULT 0,
+  last_error text NULL,
   sent_templates varchar(255) NOT NULL DEFAULT '',
   next_send_at datetime NULL DEFAULT NULL,
   last_email_at datetime NULL DEFAULT NULL,
@@ -168,7 +192,7 @@ CREATE TABLE {$log} (
 ) {$collate};";
 
 		dbDelta( $sql );
-		update_option( 'oli_acr_db_version', OLI_ACR_DB_VERSION, false );
+		update_option( 'oli_acr_db_version', OLI_ACR_DB_VERSION, true );
 	}
 
 	/**

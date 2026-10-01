@@ -140,6 +140,57 @@ function oli_acr_consent_text( $locale = '' ) {
 }
 
 /**
+ * Balises permises dans le texte de consentement : liens (href, target, rel), gras et italique.
+ *
+ * @return array<string, array<string, bool>>
+ */
+function oli_acr_consent_allowed_html() {
+	return array(
+		'a'      => array(
+			'href'   => true,
+			'target' => true,
+			'rel'    => true,
+		),
+		'strong' => array(),
+		'em'     => array(),
+	);
+}
+
+/**
+ * Nettoie un texte de consentement saisi (éditeur) : liens, gras et italique seulement, sur une ligne.
+ *
+ * @param string $text Texte.
+ * @return string
+ */
+function oli_acr_sanitize_consent_html( $text ) {
+	$text = str_replace( array( '<b>', '</b>', '<i>', '</i>' ), array( '<strong>', '</strong>', '<em>', '</em>' ), (string) $text );
+	$text = (string) preg_replace( '#</p>\s*<p[^>]*>|<br\s*/?>#i', ' ', $text );
+	$text = (string) preg_replace( '#<(script|style)\b[^>]*>.*?</\1>#is', '', $text );
+	$text = wp_kses( $text, oli_acr_consent_allowed_html(), array( 'http', 'https', 'mailto' ) );
+	// Lien sans adresse web valable (ex. « javascript: » retiré par wp_kses) : on garde seulement le texte.
+	$text = (string) preg_replace_callback(
+		'#<a\b([^>]*)>(.*?)</a>#is',
+		static function ( $m ) {
+			return preg_match( '#\bhref=(["\'])(https?://|mailto:|/|\#)#i', $m[1] ) ? $m[0] : $m[2];
+		},
+		$text
+	);
+	// Lien qui ouvre un nouvel onglet : rel="noopener" s'il n'est pas précisé.
+	$text = (string) preg_replace( '#<a\b(?![^>]*\brel=)([^>]*\btarget=(["\'])_blank\2[^>]*)>#i', '<a$1 rel="noopener noreferrer">', $text );
+	return trim( (string) preg_replace( '/\s+/u', ' ', $text ) );
+}
+
+/**
+ * Texte de consentement prêt à afficher (HTML permis seulement).
+ *
+ * @param string $locale Langue (vide = langue de la requête).
+ * @return string
+ */
+function oli_acr_consent_html( $locale = '' ) {
+	return wp_kses( oli_acr_consent_text( $locale ), oli_acr_consent_allowed_html(), array( 'http', 'https', 'mailto' ) );
+}
+
+/**
  * Indique si un texte correspond au texte de consentement par défaut dans une des langues connues.
  *
  * @param string $text Texte.
@@ -164,6 +215,7 @@ function oli_acr_is_default_consent_text( $text ) {
  */
 function oli_acr_normalize_text( $text ) {
 	$text = str_replace( array( '<br />', '<br/>' ), '<br>', (string) $text );
+	$text = (string) preg_replace( '#</?p\b[^>]*>#i', '', $text );
 	return (string) preg_replace( '/\s+/u', '', $text );
 }
 
@@ -298,6 +350,7 @@ function oli_acr_statuses() {
 		'reminded'     => _x( 'Reminded', 'cart status', 'oli-abandoned-cart-recovery' ),
 		'recovered'    => _x( 'Recovered', 'cart status', 'oli-abandoned-cart-recovery' ),
 		'unsubscribed' => _x( 'Unsubscribed', 'cart status', 'oli-abandoned-cart-recovery' ),
+		'failed'       => _x( 'Send failed', 'cart status', 'oli-abandoned-cart-recovery' ),
 	);
 }
 
@@ -427,6 +480,79 @@ function oli_acr_log( $message, $level = 'info' ) {
 		return;
 	}
 	wc_get_logger()->log( $level, $message, array( 'source' => 'oli-abandoned-cart-recovery' ) );
+}
+
+/**
+ * Interrupteur du consentement (activé par défaut) : invités et clients connectés doivent cocher la case.
+ *
+ * @return bool
+ */
+function oli_acr_consent_required() {
+	return 'always' !== oli_acr_get_setting( 'guest_tracking' );
+}
+
+/**
+ * Le client connecté a-t-il déjà consenti (case cochée, mémorisée dans sa fiche) ?
+ *
+ * @param int $user_id Utilisateur.
+ * @return bool
+ */
+function oli_acr_user_has_consent( $user_id ) {
+	return $user_id > 0 && (bool) get_user_meta( (int) $user_id, OLI_ACR_Carts::USER_CONSENT_META, true );
+}
+
+/**
+ * Journalise une erreur dans les journaux WooCommerce, même sans WP_DEBUG (WooCommerce > État > Journaux).
+ *
+ * @param string $message Message.
+ * @return void
+ */
+function oli_acr_log_error( $message ) {
+	/**
+	 * Active la journalisation des erreurs d'envoi (activée par défaut, même sans WP_DEBUG).
+	 *
+	 * @param bool $enabled Actif ou non.
+	 */
+	if ( ! apply_filters( 'oli_acr_log_errors', true ) || ! function_exists( 'wc_get_logger' ) ) {
+		return;
+	}
+	wc_get_logger()->error( $message, array( 'source' => 'oli-abandoned-cart-recovery' ) );
+}
+
+/**
+ * Mémorise le dernier échec d'envoi pour l'avis de l'administration (jusqu'à ce qu'il soit fermé).
+ *
+ * @param string $error Cause.
+ * @return void
+ */
+function oli_acr_record_failure( $error ) {
+	$failure = get_option( 'oli_acr_mail_failure', array() );
+	$count   = is_array( $failure ) && isset( $failure['count'] ) ? (int) $failure['count'] : 0;
+	update_option(
+		'oli_acr_mail_failure',
+		array(
+			'count' => $count + 1,
+			'time'  => time(),
+			'error' => substr( (string) $error, 0, 500 ),
+		),
+		false
+	);
+}
+
+/**
+ * Adresse IP du client (REMOTE_ADDR ; filtrable derrière un mandataire de confiance).
+ *
+ * @return string
+ */
+function oli_acr_client_ip() {
+	$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+	/**
+	 * Filtre l'adresse IP utilisée pour la limite de débit de la capture (ex. en-tête d'un mandataire de confiance).
+	 *
+	 * @param string $ip Adresse IP.
+	 */
+	$ip = (string) apply_filters( 'oli_acr_client_ip', $ip );
+	return filter_var( $ip, FILTER_VALIDATE_IP ) ? $ip : '0.0.0.0';
 }
 
 /**

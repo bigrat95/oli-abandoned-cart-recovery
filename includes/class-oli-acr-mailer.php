@@ -22,6 +22,20 @@ class OLI_ACR_Mailer {
 	private static $sending = array();
 
 	/**
+	 * Cause du dernier échec d'envoi (wp_mail_failed).
+	 *
+	 * @var string
+	 */
+	private static $last_error = '';
+
+	/**
+	 * Partie texte du courriel en cours d'envoi (multipart/alternative).
+	 *
+	 * @var string
+	 */
+	private static $alt_body = '';
+
+	/**
 	 * Accroches.
 	 *
 	 * @return void
@@ -131,6 +145,7 @@ class OLI_ACR_Mailer {
 		$sent = self::deliver_template( $tpl, $context );
 		if ( ! $sent ) {
 			self::delete_log( $log_id );
+			self::delete_coupon( $coupon );
 			return false;
 		}
 
@@ -140,6 +155,8 @@ class OLI_ACR_Mailer {
 			$cart->id,
 			array(
 				'status'         => 'reminded',
+				'fail_count'     => 0,
+				'last_error'     => '',
 				'emails_sent'    => (int) $cart->emails_sent + 1,
 				'sent_templates' => implode( ',', array_unique( $sent_templates ) ),
 				'last_email_at'  => oli_acr_now(),
@@ -254,6 +271,7 @@ class OLI_ACR_Mailer {
 		$sent = self::deliver_template( $tpl, $context );
 		if ( ! $sent ) {
 			self::delete_log( $log_id );
+			self::delete_coupon( $coupon );
 			return false;
 		}
 		$sent_templates   = (array) $order->get_meta( '_oli_acr_sent' );
@@ -448,19 +466,120 @@ class OLI_ACR_Mailer {
 			$headers[] = 'List-Unsubscribe-Post: List-Unsubscribe=One-Click';
 		}
 
-		self::$sending = array(
+		self::$sending    = array(
 			'name'  => oli_acr_get_setting( 'sender_name' ),
 			'email' => oli_acr_get_setting( 'sender_email' ),
 		);
+		self::$last_error = '';
+		self::$alt_body   = self::html_to_text( $heading, $body );
 		add_filter( 'woocommerce_email_from_name', array( __CLASS__, 'filter_from_name' ), 99 );
 		add_filter( 'woocommerce_email_from_address', array( __CLASS__, 'filter_from_address' ), 99 );
+		add_action( 'wp_mail_failed', array( __CLASS__, 'capture_failure' ) );
+		add_action( 'phpmailer_init', array( __CLASS__, 'add_alt_body' ), 99 );
 		$sent = $mailer->send( $to, $subject, $message, implode( "\r\n", $headers ) . "\r\n" );
+		remove_action( 'phpmailer_init', array( __CLASS__, 'add_alt_body' ), 99 );
+		remove_action( 'wp_mail_failed', array( __CLASS__, 'capture_failure' ) );
 		remove_filter( 'woocommerce_email_from_name', array( __CLASS__, 'filter_from_name' ), 99 );
 		remove_filter( 'woocommerce_email_from_address', array( __CLASS__, 'filter_from_address' ), 99 );
-		self::$sending = array();
+		self::$sending  = array();
+		self::$alt_body = '';
 
-		oli_acr_log( sprintf( 'Courriel « %s » envoyé à %s : %s', $subject, $to, $sent ? 'oui' : 'non' ) );
+		if ( ! $sent && '' === self::raw_error() ) {
+			self::$last_error = __( 'wp_mail() returned false (no error message was given by the mailer).', 'oli-abandoned-cart-recovery' );
+		}
+		oli_acr_log( sprintf( 'Email "%s" to %s: %s', $subject, $to, $sent ? 'sent' : 'failed (' . self::$last_error . ')' ), $sent ? 'info' : 'error' );
 		return (bool) $sent;
+	}
+
+	/**
+	 * Mémorise la cause d'un échec de wp_mail().
+	 *
+	 * @param WP_Error $error Erreur.
+	 * @return void
+	 */
+	public static function capture_failure( $error ) {
+		if ( is_wp_error( $error ) ) {
+			self::$last_error = wp_strip_all_tags( $error->get_error_message() );
+		}
+	}
+
+	/**
+	 * Cause brute du dernier échec (vide si wp_mail_failed n'a rien signalé).
+	 *
+	 * @return string
+	 */
+	private static function raw_error() {
+		return self::$last_error;
+	}
+
+	/**
+	 * Cause du dernier échec d'envoi.
+	 *
+	 * @return string
+	 */
+	public static function last_error() {
+		return '' !== self::$last_error ? self::$last_error : __( 'Unknown error', 'oli-abandoned-cart-recovery' );
+	}
+
+	/**
+	 * Ajoute la partie texte (multipart/alternative) au courriel en cours.
+	 *
+	 * @param PHPMailer\PHPMailer\PHPMailer $phpmailer Instance.
+	 * @return void
+	 */
+	public static function add_alt_body( $phpmailer ) {
+		if ( '' !== self::$alt_body && 'text/html' === $phpmailer->ContentType ) { // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- Propriété de PHPMailer.
+			$phpmailer->AltBody = self::$alt_body; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- Propriété de PHPMailer.
+		}
+	}
+
+	/**
+	 * Version texte d'un courriel HTML : liens en clair, tableaux et paragraphes sur des lignes.
+	 *
+	 * @param string $heading En-tête.
+	 * @param string $html    Corps HTML.
+	 * @return string
+	 */
+	public static function html_to_text( $heading, $html ) {
+		$html = (string) preg_replace( '#<(head|style|script)\b[^>]*>.*?</\1>#is', '', (string) $html );
+		$html = (string) preg_replace( '#<img\b[^>]*>#i', '', $html );
+		$html = (string) preg_replace_callback(
+			'#<a\b[^>]*href=(["\'])(.*?)\1[^>]*>(.*?)</a>#is',
+			static function ( $m ) {
+				$url  = html_entity_decode( $m[2], ENT_QUOTES, 'UTF-8' );
+				$text = trim( html_entity_decode( wp_strip_all_tags( $m[3] ), ENT_QUOTES, 'UTF-8' ) );
+				if ( '' === $url || '#' === $url || $text === $url ) {
+					return '' !== $text ? $text : $url;
+				}
+				return ( '' !== $text ? $text . ' : ' : '' ) . $url;
+			},
+			$html
+		);
+		$html = (string) preg_replace( '#<br\s*/?>#i', "\n", $html );
+		$html = (string) preg_replace( '#</(p|div|h[1-6]|tr|table|li|ul|ol)>#i', "\n\n", $html );
+		$html = (string) preg_replace( '#</t[dh]>#i', '   ', $html );
+		$text = html_entity_decode( wp_strip_all_tags( $html ), ENT_QUOTES, 'UTF-8' );
+		$text = (string) preg_replace( '/[ \t\x{00A0}]+/u', ' ', $text );
+		$text = implode( "\n", array_map( 'trim', explode( "\n", $text ) ) );
+		$text = trim( (string) preg_replace( "/\n{3,}/", "\n\n", $text ) );
+		$head = trim( wp_strip_all_tags( (string) $heading ) );
+		return ( '' !== $head ? $head . "\n\n" : '' ) . $text;
+	}
+
+	/**
+	 * Supprime un coupon généré pour un envoi qui a échoué (le nouvel essai en créera un autre).
+	 *
+	 * @param string $code Code.
+	 * @return void
+	 */
+	public static function delete_coupon( $code ) {
+		if ( '' === (string) $code ) {
+			return;
+		}
+		$id = wc_get_coupon_id_by_code( $code );
+		if ( $id ) {
+			wp_delete_post( $id, true );
+		}
 	}
 
 	/**

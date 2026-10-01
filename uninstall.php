@@ -179,10 +179,13 @@ if ( oli_acr_uninstall_table_exists( $oli_acr_wc_log ) ) {
 // phpcs:enable
 
 // Options et transitoires.
-foreach ( array( 'oli_acr_settings', 'oli_acr_templates', 'oli_acr_blocklist', 'oli_acr_db_version', 'oli_acr_schedule_signature', 'oli_acr_version', 'oli_acr_languages_signature', 'woocommerce_oli_acr_admin_recovered_settings' ) as $oli_acr_option ) {
+foreach ( array( 'oli_acr_settings', 'oli_acr_templates', 'oli_acr_blocklist', 'oli_acr_db_version', 'oli_acr_schedule_signature', 'oli_acr_version', 'oli_acr_languages_signature', 'oli_acr_process_lock', 'oli_acr_mail_failure', 'oli_acr_notice_consent_migrated', 'woocommerce_oli_acr_admin_recovered_settings' ) as $oli_acr_option ) {
 	delete_option( $oli_acr_option );
 }
 delete_transient( 'oli_acr_lock' );
+// Limites de débit de la capture (transitoires par IP).
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Désinstallation, transitoires à motif.
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s", $wpdb->esc_like( '_transient_oli_acr_rl_' ) . '%', $wpdb->esc_like( '_transient_timeout_oli_acr_rl_' ) . '%' ) );
 
 // Capacité dédiée.
 foreach ( array( 'administrator', 'shop_manager' ) as $oli_acr_role_name ) {

@@ -35,6 +35,8 @@ class OLI_ACR_Admin {
 		add_action( 'admin_post_oli_acr_test_email', array( __CLASS__, 'test_email' ) );
 		add_action( 'admin_post_oli_acr_cart_action', array( __CLASS__, 'cart_action' ) );
 		add_action( 'admin_post_oli_acr_order_action', array( __CLASS__, 'order_action' ) );
+		add_action( 'admin_post_oli_acr_dismiss_notice', array( __CLASS__, 'dismiss_notice' ) );
+		add_action( 'admin_notices', array( __CLASS__, 'global_notices' ) );
 		add_filter( 'plugin_action_links_' . OLI_ACR_BASENAME, array( __CLASS__, 'action_links' ) );
 	}
 
@@ -436,16 +438,23 @@ class OLI_ACR_Admin {
 		echo '<tr><th>' . esc_html__( 'Consider a cart abandoned after', 'oli-abandoned-cart-recovery' ) . '</th><td>';
 		self::duration_field( 's[abandon_after]', $s['abandon_after'] );
 		echo '<p class="description">' . esc_html__( 'Time without activity before an active cart becomes abandoned. Template delays are counted from that moment.', 'oli-abandoned-cart-recovery' ) . '</p></td></tr>';
-		echo '<tr><th>' . esc_html__( 'Guest carts', 'oli-abandoned-cart-recovery' ) . '</th><td><select name="s[guest_tracking]">';
-		$modes = array(
-			'consent' => __( 'Only when the guest checks the consent box (default, recommended for Quebec Law 25 and GDPR)', 'oli-abandoned-cart-recovery' ),
-			'always'  => __( 'Always capture guest carts (without consent)', 'oli-abandoned-cart-recovery' ),
-			'never'   => __( 'Never (registered customers only)', 'oli-abandoned-cart-recovery' ),
-		);
-		foreach ( $modes as $key => $label ) {
-			printf( '<option value="%s"%s>%s</option>', esc_attr( $key ), selected( $s['guest_tracking'], $key, false ), esc_html( $label ) );
-		}
+		$consent_on = 'always' !== $s['guest_tracking'];
+		echo '<tr><th>' . esc_html__( 'Guest carts', 'oli-abandoned-cart-recovery' ) . '</th><td><select name="s[guest_capture]">';
+		printf( '<option value="capture"%s>%s</option>', selected( 'never' !== $s['guest_tracking'], true, false ), esc_html__( 'Capture guest carts', 'oli-abandoned-cart-recovery' ) );
+		printf( '<option value="never"%s>%s</option>', selected( 'never', $s['guest_tracking'], false ), esc_html__( 'Never (registered customers only)', 'oli-abandoned-cart-recovery' ) );
 		echo '</select></td></tr>';
+		echo '<tr><th>' . esc_html__( 'Require consent', 'oli-abandoned-cart-recovery' ) . '</th><td>';
+		printf(
+			'<input type="hidden" name="s[consent_required]" value="no"><label><input type="checkbox" name="s[consent_required]" value="yes"%s> %s</label>',
+			checked( $consent_on, true, false ),
+			esc_html__( 'Show a consent checkbox at checkout and save an email and cart (guests and logged-in customers) only when it is checked (recommended, on by default)', 'oli-abandoned-cart-recovery' )
+		);
+		if ( ! $consent_on ) {
+			echo '<div class="notice notice-error inline oli-acr-consent-off"><p><strong>' . esc_html__( 'Consent is turned off.', 'oli-abandoned-cart-recovery' ) . '</strong> ' . esc_html__( 'Emails and carts of guests and logged-in customers are saved without consent. Quebec Law 25 and the GDPR generally require explicit consent before saving this data for marketing reminders. By turning consent off, you, the site owner, are responsible for having another legal basis.', 'oli-abandoned-cart-recovery' ) . '</p></div>';
+		} else {
+			echo '<p class="description">' . esc_html__( 'Turning this off saves the data of guests and logged-in customers without consent: you then become responsible for compliance with Quebec Law 25 and the GDPR.', 'oli-abandoned-cart-recovery' ) . '</p>';
+		}
+		echo '</td></tr>';
 		echo '<tr><th>' . esc_html__( 'Fallback language', 'oli-abandoned-cart-recovery' ) . '</th><td><select name="s[fallback_language]">';
 		printf( '<option value="">%s</option>', esc_html( sprintf( /* translators: %s: language name. */ __( 'Site default language (%s)', 'oli-abandoned-cart-recovery' ), OLI_ACR_Lang::label( OLI_ACR_Lang::adapter()->default_language() ) ) ) );
 		foreach ( OLI_ACR_Lang::adapter()->languages() as $locale ) {
@@ -465,16 +474,28 @@ class OLI_ACR_Admin {
 			if ( '' === $value && OLI_ACR_Lang::fallback_language() === $locale ) {
 				$value = oli_acr_consent_base_text( $locale );
 			}
-			printf(
-				'<p class="oli-acr-lang-field"><label for="oli-acr-consent-%1$s"><strong>%2$s</strong></label><br><textarea id="oli-acr-consent-%1$s" name="s[consent_texts][%1$s]" rows="2" class="large-text" lang="%3$s" placeholder="%4$s">%5$s</textarea></p>',
-				esc_attr( $locale ),
-				esc_html( OLI_ACR_Lang::label( $locale ) ),
-				esc_attr( str_replace( '_', '-', $locale ) ),
-				esc_attr( oli_acr_consent_text( $locale ) ),
-				esc_textarea( oli_acr_is_default_consent_text( $value ) ? '' : $value )
+			printf( '<div class="oli-acr-lang-field" lang="%1$s"><p><strong>%2$s</strong></p>', esc_attr( str_replace( '_', '-', $locale ) ), esc_html( OLI_ACR_Lang::label( $locale ) ) );
+			wp_editor(
+				oli_acr_is_default_consent_text( $value ) ? '' : $value,
+				'oli_acr_consent_' . strtolower( (string) preg_replace( '/[^A-Za-z0-9]/', '_', $locale ) ),
+				array(
+					'textarea_name' => 's[consent_texts][' . $locale . ']',
+					'textarea_rows' => 3,
+					'media_buttons' => false,
+					'teeny'         => true,
+					'wpautop'       => false,
+					'tinymce'       => array(
+						'toolbar1'          => 'bold,italic,link,unlink',
+						'toolbar2'          => '',
+						'forced_root_block' => '',
+					),
+					'quicktags'     => array( 'buttons' => 'strong,em,link' ),
+				)
 			);
+			/* translators: %s: text used when the field is empty. */
+			printf( '<p class="description">%s</p></div>', wp_kses( sprintf( __( 'Empty field: %s', 'oli-abandoned-cart-recovery' ), '<em>' . oli_acr_consent_html( $locale ) . '</em>' ), oli_acr_consent_allowed_html() ) );
 		}
-		echo '<p class="description">' . esc_html__( 'Label of the checkbox shown under the email field (consent mode), for each language. Leave a language empty to use, in order: its WPML or Polylang string translation, the default text translated in that language, then the fallback language text.', 'oli-abandoned-cart-recovery' ) . '</p></td></tr>';
+		echo '<p class="description">' . esc_html__( 'Label of the consent checkbox shown under the email field, for each language. Links (for example to your privacy policy), bold and italic are allowed. Leave a language empty to use, in order: its WPML or Polylang string translation, the default text translated in that language, then the fallback language text.', 'oli-abandoned-cart-recovery' ) . '</p></td></tr>';
 		echo '<tr><th>' . esc_html__( 'Registered customers tracked', 'oli-abandoned-cart-recovery' ) . '</th><td>';
 		printf( '<label><input type="radio" name="s[roles_mode]" value="all"%s> %s</label><br>', checked( 'all', $s['roles_mode'], false ), esc_html__( 'All roles', 'oli-abandoned-cart-recovery' ) );
 		printf( '<label><input type="radio" name="s[roles_mode]" value="selected"%s> %s</label><br>', checked( 'selected', $s['roles_mode'], false ), esc_html__( 'Only these roles:', 'oli-abandoned-cart-recovery' ) );
@@ -559,12 +580,18 @@ class OLI_ACR_Admin {
 		$new['cron_interval']        = oli_acr_sanitize_duration( isset( $raw['cron_interval'] ) ? $raw['cron_interval'] : array(), 1 );
 		$new['delete_carts_after']   = oli_acr_sanitize_duration( isset( $raw['delete_carts_after'] ) ? $raw['delete_carts_after'] : array() );
 		$new['retention_days']       = isset( $raw['retention_days'] ) ? absint( $raw['retention_days'] ) : 0;
-		$new['guest_tracking']       = isset( $raw['guest_tracking'] ) && in_array( $raw['guest_tracking'], array( 'always', 'consent', 'never' ), true ) ? $raw['guest_tracking'] : 'consent';
-		$new['fallback_language']    = isset( $raw['fallback_language'] ) && in_array( $raw['fallback_language'], OLI_ACR_Lang::adapter()->languages(), true ) ? (string) $raw['fallback_language'] : '';
-		$new['consent_texts']        = array();
-		$submitted_consent           = isset( $raw['consent_texts'] ) && is_array( $raw['consent_texts'] ) ? $raw['consent_texts'] : array();
+		if ( isset( $raw['guest_capture'] ) ) {
+			// Interrupteur du consentement (activé par défaut) : « consent » si coché, « always » sinon.
+			$consent_required      = ! isset( $raw['consent_required'] ) || 'no' !== $raw['consent_required'];
+			$new['guest_tracking'] = 'never' === $raw['guest_capture'] ? 'never' : ( $consent_required ? 'consent' : 'always' );
+		} else {
+			$new['guest_tracking'] = isset( $raw['guest_tracking'] ) && in_array( $raw['guest_tracking'], array( 'always', 'consent', 'never' ), true ) ? $raw['guest_tracking'] : 'consent';
+		}
+		$new['fallback_language'] = isset( $raw['fallback_language'] ) && in_array( $raw['fallback_language'], OLI_ACR_Lang::adapter()->languages(), true ) ? (string) $raw['fallback_language'] : '';
+		$new['consent_texts']     = array();
+		$submitted_consent        = isset( $raw['consent_texts'] ) && is_array( $raw['consent_texts'] ) ? $raw['consent_texts'] : array();
 		foreach ( OLI_ACR_Lang::languages() as $locale ) {
-			$text = isset( $submitted_consent[ $locale ] ) ? sanitize_textarea_field( $submitted_consent[ $locale ] ) : '';
+			$text = isset( $submitted_consent[ $locale ] ) ? oli_acr_sanitize_consent_html( (string) $submitted_consent[ $locale ] ) : '';
 			// Texte par défaut : on n'enregistre rien pour qu'il reste traduit dans la langue du visiteur.
 			if ( '' !== trim( $text ) && ! oli_acr_is_default_consent_text( $text ) ) {
 				$new['consent_texts'][ $locale ] = $text;
@@ -580,7 +607,7 @@ class OLI_ACR_Admin {
 		$new['reply_to']        = isset( $raw['reply_to'] ) ? sanitize_email( $raw['reply_to'] ) : '';
 		$new['admin_recipient'] = isset( $raw['admin_recipient'] ) ? implode( ',', array_filter( array_map( 'sanitize_email', explode( ',', $raw['admin_recipient'] ) ) ) ) : '';
 		$new['coupon_prefix']   = isset( $raw['coupon_prefix'] ) ? strtoupper( preg_replace( '/[^A-Za-z0-9\-_]/', '', $raw['coupon_prefix'] ) ) : '';
-		update_option( 'oli_acr_settings', $new, false );
+		update_option( 'oli_acr_settings', $new, true );
 
 		// Liste d'exclusion.
 		$lines = isset( $_POST['blocklist'] ) ? explode( "\n", sanitize_textarea_field( wp_unslash( $_POST['blocklist'] ) ) ) : array();
@@ -906,6 +933,75 @@ class OLI_ACR_Admin {
 	}
 
 	/**
+	 * Avis généraux de l'administration (toutes les pages, utilisateurs autorisés seulement).
+	 *
+	 * - Consentement désactivé : avertissement permanent (Loi 25 et RGPD).
+	 * - Migration R2 : le mode « toujours » est passé au consentement (jusqu'à fermeture).
+	 * - Échecs d'envoi des relances (jusqu'à fermeture).
+	 *
+	 * @return void
+	 */
+	public static function global_notices() {
+		if ( ! current_user_can( OLI_ACR_CAP ) ) {
+			return;
+		}
+		if ( 'always' === oli_acr_get_setting( 'guest_tracking' ) ) {
+			printf(
+				'<div class="notice notice-error oli-acr-consent-off"><p><strong>%1$s</strong> %2$s <a href="%3$s">%4$s</a></p></div>',
+				esc_html__( 'Oli Abandoned Cart Recovery: consent is turned off.', 'oli-abandoned-cart-recovery' ),
+				esc_html__( 'Emails and carts of guests and logged-in customers are saved without asking for consent. Quebec Law 25 and the GDPR generally require explicit consent before saving this data for marketing reminders. You are responsible for having another legal basis.', 'oli-abandoned-cart-recovery' ),
+				esc_url( self::url( 'settings' ) ),
+				esc_html__( 'Turn consent back on', 'oli-abandoned-cart-recovery' )
+			);
+		}
+		if ( get_option( 'oli_acr_notice_consent_migrated' ) ) {
+			printf(
+				'<div class="notice notice-warning oli-acr-consent-migrated"><p><strong>%1$s</strong> %2$s <a href="%3$s">%4$s</a> | <a href="%5$s">%6$s</a></p></div>',
+				esc_html__( 'Oli Abandoned Cart Recovery 1.1.0: consent is now required.', 'oli-abandoned-cart-recovery' ),
+				esc_html__( 'Your store saved guest carts without consent ("Always" mode). To comply with Quebec Law 25 and the GDPR, the update turned consent on: guests and logged-in customers are now tracked only when they check the consent box at checkout. You can turn it off again in the settings, under your own responsibility.', 'oli-abandoned-cart-recovery' ),
+				esc_url( self::url( 'settings' ) ),
+				esc_html__( 'Review the settings', 'oli-abandoned-cart-recovery' ),
+				esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=oli_acr_dismiss_notice&notice=consent_migrated' ), 'oli_acr_dismiss_consent_migrated' ) ),
+				esc_html__( 'Dismiss', 'oli-abandoned-cart-recovery' )
+			);
+		}
+		$failure = get_option( 'oli_acr_mail_failure' );
+		if ( is_array( $failure ) && ! empty( $failure['count'] ) ) {
+			printf(
+				'<div class="notice notice-error oli-acr-mail-failure"><p><strong>%1$s</strong> %2$s <code>%3$s</code> %4$s <a href="%5$s">%6$s</a> | <a href="%7$s">%8$s</a> | <a href="%9$s">%10$s</a></p></div>',
+				esc_html__( 'Oli Abandoned Cart Recovery: some reminders could not be sent.', 'oli-abandoned-cart-recovery' ),
+				/* translators: 1: number of failures, 2: date of the last failure. */
+				esc_html( sprintf( __( '%1$d failure(s), last one on %2$s:', 'oli-abandoned-cart-recovery' ), (int) $failure['count'], wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $failure['time'] ) ) ),
+				esc_html( (string) $failure['error'] ),
+				esc_html__( 'Failed reminders are retried automatically. Check your mail settings (SMTP).', 'oli-abandoned-cart-recovery' ),
+				esc_url( self::url( 'carts', array( 'status' => 'failed' ) ) ),
+				esc_html__( 'Failed carts', 'oli-abandoned-cart-recovery' ),
+				esc_url( admin_url( 'admin.php?page=wc-status&tab=logs&source=oli-abandoned-cart-recovery' ) ),
+				esc_html__( 'Logs', 'oli-abandoned-cart-recovery' ),
+				esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=oli_acr_dismiss_notice&notice=mail_failure' ), 'oli_acr_dismiss_mail_failure' ) ),
+				esc_html__( 'Dismiss', 'oli-abandoned-cart-recovery' )
+			);
+		}
+	}
+
+	/**
+	 * Ferme un avis (nonce par avis).
+	 *
+	 * @return void
+	 */
+	public static function dismiss_notice() {
+		self::check_cap();
+		$notice = isset( $_GET['notice'] ) ? sanitize_key( $_GET['notice'] ) : '';
+		if ( ! in_array( $notice, array( 'consent_migrated', 'mail_failure' ), true ) ) {
+			wp_die( esc_html__( 'Unknown notice.', 'oli-abandoned-cart-recovery' ), '', array( 'response' => 400 ) );
+		}
+		check_admin_referer( 'oli_acr_dismiss_' . $notice );
+		delete_option( 'consent_migrated' === $notice ? 'oli_acr_notice_consent_migrated' : 'oli_acr_mail_failure' );
+		wp_safe_redirect( wp_get_referer() ? wp_get_referer() : self::url( 'dashboard' ) );
+		exit;
+	}
+
+	/**
 	 * Actions sur un panier : envoi immédiat ou suppression.
 	 *
 	 * @return void
@@ -925,7 +1021,7 @@ class OLI_ACR_Admin {
 			self::redirect( 'carts', 'deleted' );
 		}
 		// Seuls les paniers encore actifs peuvent être relancés (pas récupérés, désabonnés ni terminés).
-		if ( 'send' !== $do || ! in_array( $cart->status, OLI_ACR_Carts::LIVE_STATUSES, true ) || oli_acr_is_unsubscribed( $cart->email ) || (int) $cart->order_id > 0 ) {
+		if ( 'send' !== $do || ! in_array( $cart->status, OLI_ACR_Carts::LIVE_STATUSES, true ) || oli_acr_is_unsubscribed( $cart->email ) || (int) $cart->order_id > 0 || ! OLI_ACR_Scheduler::cart_owner_tracked( $cart ) ) {
 			self::redirect( 'carts', 'not_sent' );
 		}
 		$templates = OLI_ACR_Templates::active( 'cart' );
@@ -938,7 +1034,12 @@ class OLI_ACR_Admin {
 			$cart->abandoned_at = oli_acr_now();
 			OLI_ACR_Carts::update( $id, array( 'abandoned_at' => $cart->abandoned_at ) );
 		}
-		$ok = OLI_ACR_Mailer::send_cart_email( $cart, $next['id'], $next );
+		// Envoi manuel : le compteur d'échecs repart de zéro.
+		$cart->fail_count = 0;
+		$ok               = OLI_ACR_Mailer::send_cart_email( $cart, $next['id'], $next );
+		if ( ! $ok ) {
+			OLI_ACR_Scheduler::cart_failed( $cart, $next['id'] );
+		}
 		if ( $ok ) {
 			// La suite de la séquence continue automatiquement.
 			$done[]    = $next['id'];
@@ -963,7 +1064,14 @@ class OLI_ACR_Admin {
 			$done = array_filter( (array) $order->get_meta( '_oli_acr_sent' ) );
 			foreach ( OLI_ACR_Templates::active( 'order' ) as $tpl_id => $tpl ) {
 				if ( ! in_array( $tpl_id, $done, true ) ) {
+					$order->delete_meta_data( '_oli_acr_fail_count' );
+					$order->delete_meta_data( '_oli_acr_retry_at' );
 					$ok = OLI_ACR_Mailer::send_order_email( $order, $tpl_id, $tpl );
+					if ( ! $ok ) {
+						OLI_ACR_Scheduler::order_failed( $order, $tpl_id );
+					} else {
+						$order->save();
+					}
 					self::redirect( 'pending', $ok ? 'sent' : 'not_sent' );
 				}
 			}

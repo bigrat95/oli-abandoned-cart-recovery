@@ -173,6 +173,10 @@ class OLI_ACR_Privacy {
 		$carts = (int) $wpdb->delete( oli_acr_table( 'carts' ), array( 'email' => $email ) );
 		$logs  = (int) $wpdb->delete( oli_acr_table( 'log' ), array( 'email' => $email ) );
 		// phpcs:enable
+		$user = get_user_by( 'email', $email );
+		if ( $user && delete_user_meta( $user->ID, OLI_ACR_Carts::USER_CONSENT_META ) ) {
+			++$carts;
+		}
 		$messages = array();
 		if ( oli_acr_is_unsubscribed( $email ) ) {
 			$messages[] = __( 'The email address was kept in the unsubscribe list so no reminder is ever sent again.', 'oli-abandoned-cart-recovery' );
