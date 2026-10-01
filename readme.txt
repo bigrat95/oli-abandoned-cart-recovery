@@ -12,17 +12,20 @@ Recover abandoned WooCommerce carts and unpaid orders with reminder emails, uniq
 
 == Description ==
 
-**Oli Abandoned Cart Recovery** captures the customer's email as soon as it is typed on the checkout page — even for guests who never place an order — saves the cart, and sends a sequence of reminder emails when the cart is abandoned. Every email has a secure recovery link that refills the cart, pre-fills the email and sends the customer straight to checkout. Reminders stop automatically as soon as an order is placed.
+**Oli Abandoned Cart Recovery** asks for the customer's consent on the checkout page and, once the consent box is ticked, saves the email and the cart — even for guests who never place an order — and sends a sequence of reminder emails when the cart is abandoned. Consent is on by default for guests and logged-in customers (Quebec Law 25, GDPR). Every email has a secure recovery link that refills the cart, pre-fills the email and sends the customer straight to checkout. Reminders stop automatically as soon as an order is placed.
 
 It works with the **classic checkout** and the **block checkout**, is compatible with **HPOS** (High-Performance Order Storage), and does all the heavy work in the background with **Action Scheduler** (WP-Cron fallback). Nothing runs on the front end except one tiny script on the checkout page.
 
 = Capture =
 
-* **Email captured on the fly** — sent on blur/change with a debounce, a nonce and server-side `is_email` validation
+* **Email captured on the fly, with consent** — once the consent box is ticked, the email is sent on blur/change with a debounce, a nonce and server-side `is_email` validation
 * **Classic and block checkout** — one delegated listener works with both, through the lightweight `wc-ajax` endpoint
 * **Phone, first and last name** captured with the email
-* **Guests and registered customers** — logged-in carts are updated every time the cart changes
-* **Consent first (default)** — for guests, nothing is saved (no email, phone or cart) until they tick the consent checkbox under the email field (classic and block checkout). The default text follows each visitor's language; you can replace it with your own
+* **Guests and registered customers** — logged-in carts are updated every time the cart changes, once the customer has consented
+* **Consent first (default)** — with the **Require consent** switch on (default), nothing is saved for guests or logged-in customers (no email, phone or cart) until they tick the consent checkbox under the email field (classic and block checkout). A logged-in customer's consent is remembered in their account and can be withdrawn by unticking the box. The switch can be turned off by the site owner, under their own responsibility: a permanent warning (Law 25, GDPR) is then shown in the admin
+* **Consent text with links** — edited per language with a small editor (links, bold, italic, saved with `wp_kses`), for example to link your privacy policy. Left empty, the default text is translated in each visitor's language
+* **Abuse protection** — rate limits on the capture endpoint (per IP and per session, `oli_acr_capture_rate_limits` filter) and a honeypot field
+* **Cache-proof** — checkout pages send no-cache headers and `DONOTCACHEPAGE`; an expired nonce from a cached page is refreshed automatically
 * **Tracked roles** — all users or only the roles you choose
 * **Cart snapshot** — products, quantities, variations, total, currency and language, linked to the WooCommerce session and a secure token
 
@@ -41,7 +44,8 @@ It works with the **classic checkout** and the **block checkout**, is compatible
 * **Several email templates**, each with its own delay, subject, heading, reply-to address, content, recovery button label and active/inactive status
 * **Sent in sequence** — reminder #1, then #2, and so on, counted from the moment the cart was abandoned
 * **Placeholders** — `{first_name}`, `{last_name}`, `{full_name}`, `{email}`, `{cart_items}`, `{cart_total}`, `{recovery_link}`, `{recovery_button}`, `{coupon}`, `{coupon_code}`, `{unsubscribe_link}`, `{site_name}`, `{site_url}`, `{order_number}`, `{order_date}`
-* **WooCommerce email look** — messages are wrapped in the WooCommerce email template (colors, header, footer)
+* **WooCommerce email look** — messages are wrapped in the WooCommerce email template (colors, header, footer), with a plain-text part (multipart/alternative)
+* **Retries after a failed send** — a failed reminder gets the *Send failed* status and is retried after 5 minutes, 30 minutes and 2 hours (`oli_acr_retry_delays` filter); the cause is shown in the admin and logged in WooCommerce > Status > Logs, even without `WP_DEBUG`
 * **Unique coupons** — optional single-use coupon per reminder (prefix, percentage or fixed amount, validity), restricted to the customer's email and applied automatically when the recovery link is clicked
 * **Coupon clean-up** — used and expired generated coupons are moved to the trash daily
 * **Pending orders** — reminders for unpaid orders with their own delay and templates, with a secure "pay for order" link
@@ -68,8 +72,9 @@ It works with the **classic checkout** and the **block checkout**, is compatible
 = Lightweight by design =
 
 * Two custom tables with indexes, created with `dbDelta` and a schema version
-* One indexed `UPDATE` marks carts as abandoned; reminders are processed in batches (`oli_acr_batch_size` filter)
-* No work on the front end besides the checkout script (about 2 KB, no jQuery)
+* One indexed `UPDATE` marks carts as abandoned; reminders are processed in batches (`oli_acr_batch_size` filter), under an atomic lock with a time budget so two runs never send the same reminder
+* No work on the front end besides the checkout script (about 3 KB, no jQuery); settings are autoloaded, so no extra query on other pages
+* Works with HPOS and with the legacy order storage
 * No external service, no tracking pixel
 
 == Installation ==
@@ -101,7 +106,7 @@ Extend the `OLI_ACR_Lang_Adapter` class (languages, current language, URL conver
 
 = Does it capture guests who never place an order? =
 
-Yes. The email is saved as soon as it is typed on the checkout page (on blur or change), with the cart content. No account or order is needed.
+Yes, once they consent. With the default settings, the email and the cart are saved only after the guest ticks the consent box on the checkout page; the email is then sent on blur or change, with the cart content. No account or order is needed. If you turn consent off (your responsibility), the email is saved as soon as it is typed.
 
 = Does it work with the block checkout? =
 
@@ -123,9 +128,17 @@ Yes. Orders are only accessed through the WooCommerce CRUD API and compatibility
 
 No. The capture request only runs on the checkout page. Detection and sending run in the background with Action Scheduler, in batches, on indexed queries.
 
-= Are guests tracked without consent? =
+= Are customers tracked without consent? =
 
-No, not by default. The default guest mode is **Only when the guest checks the consent box**: until the box is ticked, nothing is sent to the server or saved (no email, phone or cart). This follows Quebec's Law 25 and the GDPR, which require express consent before collecting personal information for marketing reminders. You can switch to *Always* (not recommended where consent is required) or *Never* in Settings. Existing 1.0.0 installations keep the mode that was saved.
+No, not by default. The **Require consent** switch is on by default and applies to guests and to logged-in customers: until the box is ticked, nothing is sent to the server or saved (no email, phone or cart), and no reminder is sent. A logged-in customer who ticked the box once is remembered (the box is shown ticked and can be unticked to withdraw consent). This follows Quebec's Law 25 and the GDPR, which require express consent before collecting personal information for marketing reminders. You can turn the switch off in Settings — guests and logged-in customers are then tracked without the box — but you become responsible for having another legal basis, and a warning stays in the admin. You can also choose to never track guests.
+
+= I upgraded from 1.0.x and my store was in "Always" mode. What changed? =
+
+Version 1.1.0 turns consent on for these stores (the switch is on) and shows an admin notice until you dismiss it. Carts of logged-in customers captured by 1.0.x without the box are no longer reminded until the customer consents. You can turn consent off again in Settings, under your own responsibility.
+
+= What happens when an email cannot be sent? =
+
+The cart gets the *Send failed* status with the error message, an admin notice is shown and the error is logged in WooCommerce > Status > Logs (source `oli-abandoned-cart-recovery`), even without `WP_DEBUG`. The reminder is retried after 5 minutes, 30 minutes and 2 hours, then the cart stays *Send failed*; use **Send next reminder now** once your mail settings are fixed.
 
 = In which language are reminders sent? =
 
@@ -154,6 +167,17 @@ The plugin stores, in the store's own database: the email, phone, first and last
 == Changelog ==
 
 = 1.1.0 =
+* New: consent switch (on by default) that applies to guests and logged-in customers; when off, a permanent Law 25 / GDPR warning is shown in the admin
+* New: consent text edited per language with links, bold and italic (`wp_kses`)
+* Privacy: logged-in customers must also tick the consent box (consent remembered in their account, withdrawable); 1.0.x logged-in carts without consent are no longer reminded
+* Privacy: stores upgraded from 1.0.x in "Always" mode switch to consent, with an admin notice
+* New: retries after a failed send (5 min, 30 min, 2 h) with the *Send failed* status, the error in the carts list, an admin notice and an error log entry, even without `WP_DEBUG`
+* New: plain-text part in reminder emails (multipart/alternative)
+* New: rate limits and honeypot on the capture endpoint
+* Fix: legacy order storage (HPOS off) — no more `meta_query` notice; already processed pending orders no longer block newer ones
+* Fix: atomic lock with renewal and time budget, and each cart is claimed before sending, so slow SMTP runs never overlap
+* Fix: checkout pages are never cached (no-cache headers, `DONOTCACHEPAGE`), and an expired capture nonce is refreshed automatically
+* Performance: settings and version options are autoloaded (2 fewer queries per page)
 * New: templates and consent text per language, edited in language tabs; default templates are created in every active language
 * New: language adapters for TranslatePress, Polylang, WPML, Weglot and WordPress core, with the `oli_acr_lang_adapters` filter to add others
 * New: reminders sent in the cart's language (language of the checkout page); recovery and unsubscribe links use the URL of that language, the recovery link opens the checkout page of that language, and the unsubscribe page is shown in that language
@@ -196,7 +220,7 @@ The plugin stores, in the store's own database: the email, phone, first and last
 == Upgrade Notice ==
 
 = 1.1.0 =
-Multilingual templates and consent text (TranslatePress, Polylang, WPML, Weglot). Existing texts are kept as the fallback language texts.
+Multilingual templates and consent text. Consent is now required for guests and logged-in customers (a store in "Always" mode switches to consent, with a notice). Failed reminders are retried.
 
 
 = 1.0.1 =

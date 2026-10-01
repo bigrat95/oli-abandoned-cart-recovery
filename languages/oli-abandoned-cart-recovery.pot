@@ -3,20 +3,20 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Oli Abandoned Cart Recovery 1.1.0\n"
-"Report-Msgid-Bugs-To: https://github.com/bigrat95/oli-abandoned-cart-recovery/issues\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/oli-abandoned-cart-recovery\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
-"Language-Team: Olivier Bigras <oli@olivierbigras.com>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-09-30T23:28:37+00:00\n"
+"POT-Creation-Date: 2026-10-01T00:27:22+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: oli-abandoned-cart-recovery\n"
 
 #. Plugin Name of the plugin
 #: oli-abandoned-cart-recovery.php
-#: includes/admin/class-oli-acr-admin.php:147
+#: includes/admin/class-oli-acr-admin.php:149
 msgid "Oli Abandoned Cart Recovery"
 msgstr ""
 
@@ -40,557 +40,634 @@ msgstr ""
 msgid "https://olivierbigras.com"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:48
-#: includes/admin/class-oli-acr-admin.php:98
+#: includes/admin/class-oli-acr-admin.php:50
+#: includes/admin/class-oli-acr-admin.php:100
 msgid "Settings"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:69
+#: includes/admin/class-oli-acr-admin.php:71
 msgid "Abandoned Carts"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:92
+#: includes/admin/class-oli-acr-admin.php:94
 msgid "Dashboard & reports"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:93
-#: includes/admin/class-oli-acr-admin.php:332
+#: includes/admin/class-oli-acr-admin.php:95
+#: includes/admin/class-oli-acr-admin.php:334
 #: includes/class-oli-acr-privacy.php:36
 #: includes/class-oli-acr-privacy.php:50
 #: includes/class-oli-acr-privacy.php:81
 msgid "Abandoned carts"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:94
-#: includes/admin/class-oli-acr-admin.php:490
+#: includes/admin/class-oli-acr-admin.php:96
+#: includes/admin/class-oli-acr-admin.php:511
 msgid "Pending orders"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:95
-#: includes/admin/class-oli-acr-admin.php:362
-#: includes/admin/class-oli-acr-admin.php:375
+#: includes/admin/class-oli-acr-admin.php:97
+#: includes/admin/class-oli-acr-admin.php:364
+#: includes/admin/class-oli-acr-admin.php:377
 #: includes/admin/class-oli-acr-log-table.php:47
 msgid "Recovered"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:96
+#: includes/admin/class-oli-acr-admin.php:98
 msgid "Email log"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:97
+#: includes/admin/class-oli-acr-admin.php:99
 msgid "Email templates"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:109
+#: includes/admin/class-oli-acr-admin.php:111
 msgid "You are not allowed to do this."
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:192
+#: includes/admin/class-oli-acr-admin.php:194
 msgid "Settings saved."
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:193
+#: includes/admin/class-oli-acr-admin.php:195
 msgid "Template saved."
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:194
+#: includes/admin/class-oli-acr-admin.php:196
 msgid "Template deleted."
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:195
+#: includes/admin/class-oli-acr-admin.php:197
 msgid "Test email sent."
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:196
+#: includes/admin/class-oli-acr-admin.php:198
 msgid "The test email could not be sent. Check the address and your mail settings."
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:197
+#: includes/admin/class-oli-acr-admin.php:199
 msgid "Reminder sent."
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:198
+#: includes/admin/class-oli-acr-admin.php:200
 msgid "No reminder was sent (no active template left, or the customer unsubscribed)."
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:199
+#: includes/admin/class-oli-acr-admin.php:201
 msgid "Cart(s) deleted."
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:247
+#: includes/admin/class-oli-acr-admin.php:249
 msgid "Search carts"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:259
+#: includes/admin/class-oli-acr-admin.php:261
 msgid "Pending order recovery is disabled. Enable it in the Settings tab to send reminders automatically."
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:311
+#: includes/admin/class-oli-acr-admin.php:313
 msgid "Last 7 days"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:312
+#: includes/admin/class-oli-acr-admin.php:314
 msgid "Last 30 days"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:313
+#: includes/admin/class-oli-acr-admin.php:315
 msgid "Last 90 days"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:314
+#: includes/admin/class-oli-acr-admin.php:316
 msgid "Last 12 months"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:315
+#: includes/admin/class-oli-acr-admin.php:317
 msgid "All time"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:333
+#: includes/admin/class-oli-acr-admin.php:335
 msgid "Pending orders reminded"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:334
-#: includes/admin/class-oli-acr-admin.php:362
-#: includes/admin/class-oli-acr-admin.php:375
+#: includes/admin/class-oli-acr-admin.php:336
+#: includes/admin/class-oli-acr-admin.php:364
+#: includes/admin/class-oli-acr-admin.php:377
 #: includes/admin/class-oli-acr-carts-table.php:46
 #: includes/admin/class-oli-acr-pending-table.php:45
 msgid "Emails sent"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:335
-#: includes/admin/class-oli-acr-admin.php:362
-#: includes/admin/class-oli-acr-admin.php:375
+#: includes/admin/class-oli-acr-admin.php:337
+#: includes/admin/class-oli-acr-admin.php:364
+#: includes/admin/class-oli-acr-admin.php:377
 msgid "Clicks"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:336
+#: includes/admin/class-oli-acr-admin.php:338
 msgid "Recovered carts"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:337
+#: includes/admin/class-oli-acr-admin.php:339
 msgid "Recovered pending orders"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:338
+#: includes/admin/class-oli-acr-admin.php:340
 msgid "Recovery rate"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:339
-#: includes/admin/class-oli-acr-admin.php:362
-#: includes/admin/class-oli-acr-admin.php:375
+#: includes/admin/class-oli-acr-admin.php:341
+#: includes/admin/class-oli-acr-admin.php:364
+#: includes/admin/class-oli-acr-admin.php:377
 msgid "Recovered revenue"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:347
+#: includes/admin/class-oli-acr-admin.php:349
 msgid "Carts right now"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:361
+#: includes/admin/class-oli-acr-admin.php:363
 msgid "Report by day"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:362
+#: includes/admin/class-oli-acr-admin.php:364
 msgid "Day"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:364
-#: includes/admin/class-oli-acr-admin.php:377
+#: includes/admin/class-oli-acr-admin.php:366
+#: includes/admin/class-oli-acr-admin.php:379
 msgid "No data for this period."
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:374
+#: includes/admin/class-oli-acr-admin.php:376
 msgid "Report by template"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:375
+#: includes/admin/class-oli-acr-admin.php:377
 #: includes/admin/class-oli-acr-log-table.php:43
 msgid "Template"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:432
+#: includes/admin/class-oli-acr-admin.php:434
 msgid "General"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:433
+#: includes/admin/class-oli-acr-admin.php:435
 msgid "Enable cart recovery"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:434
+#: includes/admin/class-oli-acr-admin.php:436
 msgid "Capture carts and send abandoned cart reminders"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:436
+#: includes/admin/class-oli-acr-admin.php:438
 msgid "Consider a cart abandoned after"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:438
+#: includes/admin/class-oli-acr-admin.php:440
 msgid "Time without activity before an active cart becomes abandoned. Template delays are counted from that moment."
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:439
+#: includes/admin/class-oli-acr-admin.php:442
 msgid "Guest carts"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:441
-msgid "Only when the guest checks the consent box (default, recommended for Quebec Law 25 and GDPR)"
-msgstr ""
-
-#: includes/admin/class-oli-acr-admin.php:442
-msgid "Always capture guest carts (without consent)"
-msgstr ""
-
 #: includes/admin/class-oli-acr-admin.php:443
+msgid "Capture guest carts"
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:444
 msgid "Never (registered customers only)"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:449
+#: includes/admin/class-oli-acr-admin.php:446
+msgid "Require consent"
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:450
+msgid "Show a consent checkbox at checkout and save an email and cart (guests and logged-in customers) only when it is checked (recommended, on by default)"
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:453
+msgid "Consent is turned off."
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:453
+msgid "Emails and carts of guests and logged-in customers are saved without consent. Quebec Law 25 and the GDPR generally require explicit consent before saving this data for marketing reminders. By turning consent off, you, the site owner, are responsible for having another legal basis."
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:455
+msgid "Turning this off saves the data of guests and logged-in customers without consent: you then become responsible for compliance with Quebec Law 25 and the GDPR."
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:458
 msgid "Fallback language"
 msgstr ""
 
 #. translators: %s: language name.
-#: includes/admin/class-oli-acr-admin.php:450
+#: includes/admin/class-oli-acr-admin.php:459
 #, php-format
 msgid "Site default language (%s)"
 msgstr ""
 
 #. translators: %s: multilingual plugin name.
-#: includes/admin/class-oli-acr-admin.php:457
+#: includes/admin/class-oli-acr-admin.php:466
 #, php-format
 msgid "Language used for a cart whose language is unknown or no longer active, and for texts that are missing in a language. Languages detected with: %s."
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:461
+#: includes/admin/class-oli-acr-admin.php:470
 msgid "Consent text"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:477
-msgid "Label of the checkbox shown under the email field (consent mode), for each language. Leave a language empty to use, in order: its WPML or Polylang string translation, the default text translated in that language, then the fallback language text."
+#. translators: %s: text used when the field is empty.
+#: includes/admin/class-oli-acr-admin.php:496
+#, php-format
+msgid "Empty field: %s"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:478
-msgid "Registered customers tracked"
-msgstr ""
-
-#: includes/admin/class-oli-acr-admin.php:479
-msgid "All roles"
-msgstr ""
-
-#: includes/admin/class-oli-acr-admin.php:480
-msgid "Only these roles:"
-msgstr ""
-
-#: includes/admin/class-oli-acr-admin.php:485
-msgid "Run the recovery task every"
-msgstr ""
-
-#: includes/admin/class-oli-acr-admin.php:487
-msgid "Runs with Action Scheduler (WooCommerce)."
-msgstr ""
-
-#: includes/admin/class-oli-acr-admin.php:487
-msgid "Runs with WP-Cron."
-msgstr ""
-
-#: includes/admin/class-oli-acr-admin.php:491
-msgid "Enable pending order recovery"
-msgstr ""
-
-#: includes/admin/class-oli-acr-admin.php:492
-msgid "Send the \"pending order\" templates to unpaid orders"
-msgstr ""
-
-#: includes/admin/class-oli-acr-admin.php:493
-msgid "Start reminding pending orders after"
-msgstr ""
-
-#: includes/admin/class-oli-acr-admin.php:495
-msgid "Cancel reminded pending orders after"
-msgstr ""
-
-#: includes/admin/class-oli-acr-admin.php:497
-msgid "0 = never. Only pending orders that received a reminder are cancelled."
+#: includes/admin/class-oli-acr-admin.php:498
+msgid "Label of the consent checkbox shown under the email field, for each language. Links (for example to your privacy policy), bold and italic are allowed. Leave a language empty to use, in order: its WPML or Polylang string translation, the default text translated in that language, then the fallback language text."
 msgstr ""
 
 #: includes/admin/class-oli-acr-admin.php:499
-msgid "Sender"
+msgid "Registered customers tracked"
 msgstr ""
 
 #: includes/admin/class-oli-acr-admin.php:500
-msgid "Sender name"
+msgid "All roles"
 msgstr ""
 
 #: includes/admin/class-oli-acr-admin.php:501
-msgid "Sender email"
-msgstr ""
-
-#: includes/admin/class-oli-acr-admin.php:502
-msgid "Default reply-to"
-msgstr ""
-
-#: includes/admin/class-oli-acr-admin.php:502
-msgid "Each template can override it."
-msgstr ""
-
-#: includes/admin/class-oli-acr-admin.php:505
-msgid "Admin notification"
-msgstr ""
-
-#: includes/admin/class-oli-acr-admin.php:505
-msgid "Notify on recovery"
+msgid "Only these roles:"
 msgstr ""
 
 #: includes/admin/class-oli-acr-admin.php:506
+msgid "Run the recovery task every"
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:508
+msgid "Runs with Action Scheduler (WooCommerce)."
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:508
+msgid "Runs with WP-Cron."
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:512
+msgid "Enable pending order recovery"
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:513
+msgid "Send the \"pending order\" templates to unpaid orders"
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:514
+msgid "Start reminding pending orders after"
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:516
+msgid "Cancel reminded pending orders after"
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:518
+msgid "0 = never. Only pending orders that received a reminder are cancelled."
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:520
+msgid "Sender"
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:521
+msgid "Sender name"
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:522
+msgid "Sender email"
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:523
+msgid "Default reply-to"
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:523
+msgid "Each template can override it."
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:526
+msgid "Admin notification"
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:526
+msgid "Notify on recovery"
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:527
 msgid "Email the admin when a cart or pending order is recovered"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:507
+#: includes/admin/class-oli-acr-admin.php:528
 #: includes/emails/class-oli-acr-email-admin-recovered.php:150
 msgid "Recipient(s)"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:507
+#: includes/admin/class-oli-acr-admin.php:528
 msgid "Subject, heading and format are in WooCommerce > Settings > Emails."
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:509
+#: includes/admin/class-oli-acr-admin.php:530
 msgid "Coupons"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:510
+#: includes/admin/class-oli-acr-admin.php:531
 msgid "Coupon prefix"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:511
+#: includes/admin/class-oli-acr-admin.php:532
 msgid "Clean up coupons"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:512
+#: includes/admin/class-oli-acr-admin.php:533
 msgid "Trash generated coupons once used"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:514
+#: includes/admin/class-oli-acr-admin.php:535
 msgid "Trash generated coupons once expired"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:517
+#: includes/admin/class-oli-acr-admin.php:538
 msgid "Data retention"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:518
+#: includes/admin/class-oli-acr-admin.php:539
 msgid "Delete unrecovered carts after"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:520
+#: includes/admin/class-oli-acr-admin.php:541
 msgid "0 = never. Active, abandoned and reminded carts older than this are deleted daily."
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:521
+#: includes/admin/class-oli-acr-admin.php:542
 msgid "Keep all data (including recovered carts and email log) for"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:521
+#: includes/admin/class-oli-acr-admin.php:542
 msgid "days"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:521
+#: includes/admin/class-oli-acr-admin.php:542
 msgid "0 = forever."
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:522
+#: includes/admin/class-oli-acr-admin.php:543
 msgid "Uninstall"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:523
+#: includes/admin/class-oli-acr-admin.php:544
 msgid "Keep the data when the plugin is deleted (settings, templates, carts, email log)"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:524
+#: includes/admin/class-oli-acr-admin.php:545
 msgid "Off by default: deleting the plugin removes all its data."
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:525
+#: includes/admin/class-oli-acr-admin.php:546
 msgid "Unsubscribed / excluded emails"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:525
+#: includes/admin/class-oli-acr-admin.php:546
 msgid "One email per line. These addresses are never tracked or emailed."
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:529
+#: includes/admin/class-oli-acr-admin.php:550
 msgid "Access"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:529
+#: includes/admin/class-oli-acr-admin.php:550
 msgid "Shop managers"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:530
+#: includes/admin/class-oli-acr-admin.php:551
 msgid "Allow the Shop manager role to use this plugin (capability oli_acr_manage)"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:624
+#: includes/admin/class-oli-acr-admin.php:659
 msgid "Add template"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:625
+#: includes/admin/class-oli-acr-admin.php:660
 #: includes/class-oli-acr-privacy.php:93
 msgid "Name"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:625
-#: includes/admin/class-oli-acr-admin.php:789
+#: includes/admin/class-oli-acr-admin.php:660
+#: includes/admin/class-oli-acr-admin.php:840
 #: includes/admin/class-oli-acr-log-table.php:44
 msgid "Type"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:625
-#: includes/admin/class-oli-acr-admin.php:790
+#: includes/admin/class-oli-acr-admin.php:660
+#: includes/admin/class-oli-acr-admin.php:841
 msgid "Send after"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:625
-#: includes/admin/class-oli-acr-admin.php:794
+#: includes/admin/class-oli-acr-admin.php:660
+#: includes/admin/class-oli-acr-admin.php:845
 #: includes/admin/class-oli-acr-log-table.php:45
 #: includes/class-oli-acr-privacy.php:134
 msgid "Coupon"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:625
+#: includes/admin/class-oli-acr-admin.php:660
 #: includes/admin/class-oli-acr-carts-table.php:43
 #: includes/class-oli-acr-privacy.php:105
 msgid "Status"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:635
-#: includes/admin/class-oli-acr-admin.php:789
+#: includes/admin/class-oli-acr-admin.php:678
+#: includes/admin/class-oli-acr-admin.php:840
 #: includes/admin/class-oli-acr-log-table.php:96
 #: includes/admin/class-oli-acr-recovered-table.php:94
 msgid "Pending order"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:635
-#: includes/admin/class-oli-acr-admin.php:789
+#: includes/admin/class-oli-acr-admin.php:678
+#: includes/admin/class-oli-acr-admin.php:840
 #: includes/admin/class-oli-acr-log-table.php:96
 #: includes/admin/class-oli-acr-recovered-table.php:94
 msgid "Abandoned cart"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:638
-#: includes/admin/class-oli-acr-admin.php:788
+#: includes/admin/class-oli-acr-admin.php:681
+#: includes/admin/class-oli-acr-admin.php:839
 msgid "Active"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:638
+#: includes/admin/class-oli-acr-admin.php:681
 msgid "Inactive"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:640
+#: includes/admin/class-oli-acr-admin.php:691
 msgid "Edit"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:642
+#: includes/admin/class-oli-acr-admin.php:693
 msgid "Delete this template?"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:643
+#: includes/admin/class-oli-acr-admin.php:694
 #: includes/admin/class-oli-acr-carts-table.php:71
 #: includes/admin/class-oli-acr-carts-table.php:170
 msgid "Delete"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:647
+#: includes/admin/class-oli-acr-admin.php:698
 msgid "Cart templates are sent in sequence, from the shortest delay to the longest, counted from the moment the cart was abandoned. Pending order templates are counted from the pending order delay set in Settings."
 msgstr ""
 
 #. translators: %s: language name.
-#: includes/admin/class-oli-acr-admin.php:679
+#: includes/admin/class-oli-acr-admin.php:730
 #, php-format
 msgid "%s — fallback"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:710
-#: includes/admin/class-oli-acr-admin.php:727
+#: includes/admin/class-oli-acr-admin.php:761
+#: includes/admin/class-oli-acr-admin.php:778
 msgid "Send a test"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:720
+#: includes/admin/class-oli-acr-admin.php:771
 msgid "Language"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:745
+#: includes/admin/class-oli-acr-admin.php:796
 msgid "Back to templates"
 msgstr ""
 
 #. translators: %s: language name.
-#: includes/admin/class-oli-acr-admin.php:755
+#: includes/admin/class-oli-acr-admin.php:806
 #, php-format
 msgid "No text saved yet for %s. The fields show what is sent in this language now (string translation, translated default text or fallback language). Save to keep your own version."
 msgstr ""
 
 #. translators: %s: language name.
-#: includes/admin/class-oli-acr-admin.php:763
+#: includes/admin/class-oli-acr-admin.php:814
 #, php-format
 msgid "Texts — %s"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:767
+#: includes/admin/class-oli-acr-admin.php:818
 msgid "Template name"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:768
+#: includes/admin/class-oli-acr-admin.php:819
 msgid "Email subject"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:769
+#: includes/admin/class-oli-acr-admin.php:820
 msgid "Email heading"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:770
+#: includes/admin/class-oli-acr-admin.php:821
 msgid "Recovery button label"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:771
+#: includes/admin/class-oli-acr-admin.php:822
 msgid "Email content"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:781
+#: includes/admin/class-oli-acr-admin.php:832
 msgid "Placeholders:"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:787
+#: includes/admin/class-oli-acr-admin.php:838
 msgid "Settings (all languages)"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:788
+#: includes/admin/class-oli-acr-admin.php:839
 msgid "Send this template automatically"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:793
+#: includes/admin/class-oli-acr-admin.php:844
 msgid "Reply-to address"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:794
+#: includes/admin/class-oli-acr-admin.php:845
 msgid "Create a unique single-use coupon for each email ({coupon})"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:796
+#: includes/admin/class-oli-acr-admin.php:847
 msgid "Percentage discount"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:796
+#: includes/admin/class-oli-acr-admin.php:847
 msgid "Fixed cart discount"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:797
+#: includes/admin/class-oli-acr-admin.php:848
 msgid "valid for"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:797
+#: includes/admin/class-oli-acr-admin.php:848
 msgid "days (0 = no expiry)"
 msgstr ""
 
-#: includes/admin/class-oli-acr-admin.php:799
+#: includes/admin/class-oli-acr-admin.php:850
 msgid "Save template"
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:951
+msgid "Oli Abandoned Cart Recovery: consent is turned off."
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:952
+msgid "Emails and carts of guests and logged-in customers are saved without asking for consent. Quebec Law 25 and the GDPR generally require explicit consent before saving this data for marketing reminders. You are responsible for having another legal basis."
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:954
+msgid "Turn consent back on"
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:960
+msgid "Oli Abandoned Cart Recovery 1.1.0: consent is now required."
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:961
+msgid "Your store saved guest carts without consent (\"Always\" mode). To comply with Quebec Law 25 and the GDPR, the update turned consent on: guests and logged-in customers are now tracked only when they check the consent box at checkout. You can turn it off again in the settings, under your own responsibility."
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:963
+msgid "Review the settings"
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:965
+#: includes/admin/class-oli-acr-admin.php:982
+msgid "Dismiss"
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:972
+msgid "Oli Abandoned Cart Recovery: some reminders could not be sent."
+msgstr ""
+
+#. translators: 1: number of failures, 2: date of the last failure.
+#: includes/admin/class-oli-acr-admin.php:974
+#, php-format
+msgid "%1$d failure(s), last one on %2$s:"
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:976
+msgid "Failed reminders are retried automatically. Check your mail settings (SMTP)."
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:978
+msgid "Failed carts"
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:980
+msgid "Logs"
+msgstr ""
+
+#: includes/admin/class-oli-acr-admin.php:996
+msgid "Unknown notice."
 msgstr ""
 
 #: includes/admin/class-oli-acr-carts-table.php:42
@@ -607,8 +684,8 @@ msgstr ""
 #: includes/admin/class-oli-acr-carts-table.php:45
 #: includes/admin/class-oli-acr-pending-table.php:43
 #: includes/admin/class-oli-acr-recovered-table.php:44
-#: includes/class-oli-acr-mailer.php:516
-#: includes/class-oli-acr-mailer.php:520
+#: includes/class-oli-acr-mailer.php:635
+#: includes/class-oli-acr-mailer.php:639
 #: includes/class-oli-acr-privacy.php:101
 msgid "Total"
 msgstr ""
@@ -640,7 +717,19 @@ msgstr ""
 msgid "(ordered without reminder)"
 msgstr ""
 
-#: includes/admin/class-oli-acr-carts-table.php:216
+#. translators: 1: number of failed attempts, 2: date of the next attempt.
+#: includes/admin/class-oli-acr-carts-table.php:190
+#, php-format
+msgid "%1$d failed attempt(s), next attempt: %2$s"
+msgstr ""
+
+#. translators: %d: number of failed attempts.
+#: includes/admin/class-oli-acr-carts-table.php:192
+#, php-format
+msgid "%d failed attempt(s), no further attempt. Use \"Send next reminder now\" after fixing your mail settings."
+msgstr ""
+
+#: includes/admin/class-oli-acr-carts-table.php:223
 msgid "No carts captured yet."
 msgstr ""
 
@@ -688,119 +777,131 @@ msgstr ""
 msgid "No recovered orders yet."
 msgstr ""
 
-#: includes/class-oli-acr-mailer.php:52
-msgid "Customer first name"
-msgstr ""
-
-#: includes/class-oli-acr-mailer.php:53
-msgid "Customer last name"
-msgstr ""
-
-#: includes/class-oli-acr-mailer.php:54
-msgid "Customer full name"
-msgstr ""
-
-#: includes/class-oli-acr-mailer.php:55
-msgid "Customer email"
-msgstr ""
-
-#: includes/class-oli-acr-mailer.php:56
-msgid "Table of the cart or order items"
-msgstr ""
-
-#: includes/class-oli-acr-mailer.php:57
-msgid "Cart or order total"
-msgstr ""
-
-#: includes/class-oli-acr-mailer.php:58
-msgid "Recovery URL"
-msgstr ""
-
-#: includes/class-oli-acr-mailer.php:59
-msgid "Recovery button"
-msgstr ""
-
-#: includes/class-oli-acr-mailer.php:60
-msgid "Coupon box (empty when no coupon)"
-msgstr ""
-
-#: includes/class-oli-acr-mailer.php:61
-msgid "Coupon code only"
-msgstr ""
-
-#: includes/class-oli-acr-mailer.php:62
-msgid "Coupon discount (e.g. 10 %). A paragraph with this tag is removed when there is no coupon."
-msgstr ""
-
-#: includes/class-oli-acr-mailer.php:63
-msgid "Unsubscribe URL"
-msgstr ""
-
-#: includes/class-oli-acr-mailer.php:64
-msgid "Site name"
-msgstr ""
-
-#: includes/class-oli-acr-mailer.php:65
-msgid "Site URL"
+#: includes/class-oli-acr-capture.php:201
+msgid "Leave this field empty"
 msgstr ""
 
 #: includes/class-oli-acr-mailer.php:66
-msgid "Order number (pending orders)"
+msgid "Customer first name"
 msgstr ""
 
 #: includes/class-oli-acr-mailer.php:67
+msgid "Customer last name"
+msgstr ""
+
+#: includes/class-oli-acr-mailer.php:68
+msgid "Customer full name"
+msgstr ""
+
+#: includes/class-oli-acr-mailer.php:69
+msgid "Customer email"
+msgstr ""
+
+#: includes/class-oli-acr-mailer.php:70
+msgid "Table of the cart or order items"
+msgstr ""
+
+#: includes/class-oli-acr-mailer.php:71
+msgid "Cart or order total"
+msgstr ""
+
+#: includes/class-oli-acr-mailer.php:72
+msgid "Recovery URL"
+msgstr ""
+
+#: includes/class-oli-acr-mailer.php:73
+msgid "Recovery button"
+msgstr ""
+
+#: includes/class-oli-acr-mailer.php:74
+msgid "Coupon box (empty when no coupon)"
+msgstr ""
+
+#: includes/class-oli-acr-mailer.php:75
+msgid "Coupon code only"
+msgstr ""
+
+#: includes/class-oli-acr-mailer.php:76
+msgid "Coupon discount (e.g. 10 %). A paragraph with this tag is removed when there is no coupon."
+msgstr ""
+
+#: includes/class-oli-acr-mailer.php:77
+msgid "Unsubscribe URL"
+msgstr ""
+
+#: includes/class-oli-acr-mailer.php:78
+msgid "Site name"
+msgstr ""
+
+#: includes/class-oli-acr-mailer.php:79
+msgid "Site URL"
+msgstr ""
+
+#: includes/class-oli-acr-mailer.php:80
+msgid "Order number (pending orders)"
+msgstr ""
+
+#: includes/class-oli-acr-mailer.php:81
 msgid "Order date (pending orders)"
 msgstr ""
 
-#: includes/class-oli-acr-mailer.php:310
+#: includes/class-oli-acr-mailer.php:328
 msgid "John"
 msgstr ""
 
-#: includes/class-oli-acr-mailer.php:311
+#: includes/class-oli-acr-mailer.php:329
 msgid "Doe"
 msgstr ""
 
 #. translators: %s: email subject.
-#: includes/class-oli-acr-mailer.php:324
+#: includes/class-oli-acr-mailer.php:342
 #, php-format
 msgid "[Test] %s"
 msgstr ""
 
-#: includes/class-oli-acr-mailer.php:357
+#: includes/class-oli-acr-mailer.php:375
 msgid "there"
 msgstr ""
 
-#: includes/class-oli-acr-mailer.php:359
+#: includes/class-oli-acr-mailer.php:377
 #: includes/class-oli-acr-templates.php:85
 msgid "Complete my order"
 msgstr ""
 
 #. translators: %s: unsubscribe link.
-#: includes/class-oli-acr-mailer.php:405
+#: includes/class-oli-acr-mailer.php:423
 #, php-format
 msgid "You received this email because you started an order on our store. %s"
 msgstr ""
 
-#: includes/class-oli-acr-mailer.php:406
+#: includes/class-oli-acr-mailer.php:424
 #: includes/class-oli-acr-recovery.php:197
 msgid "Unsubscribe"
 msgstr ""
 
-#: includes/class-oli-acr-mailer.php:516
+#: includes/class-oli-acr-mailer.php:488
+msgid "wp_mail() returned false (no error message was given by the mailer)."
+msgstr ""
+
+#: includes/class-oli-acr-mailer.php:521
+msgid "Unknown error"
+msgstr ""
+
+#: includes/class-oli-acr-mailer.php:635
 msgid "Product"
 msgstr ""
 
-#: includes/class-oli-acr-mailer.php:516
+#: includes/class-oli-acr-mailer.php:635
 msgid "Quantity"
 msgstr ""
 
 #. translators: %s: discount percentage (number).
-#: includes/class-oli-acr-mailer.php:536
+#: includes/class-oli-acr-mailer.php:655
 #, php-format
 msgid "%s%%"
 msgstr ""
 
-#: includes/class-oli-acr-mailer.php:596
+#: includes/class-oli-acr-mailer.php:715
 msgid "Created automatically by Oli Abandoned Cart Recovery."
 msgstr ""
 
@@ -821,19 +922,19 @@ msgstr ""
 msgid "Yes"
 msgstr ""
 
-#: includes/class-oli-acr-privacy.php:178
+#: includes/class-oli-acr-privacy.php:182
 msgid "The email address was kept in the unsubscribe list so no reminder is ever sent again."
 msgstr ""
 
-#: includes/class-oli-acr-privacy.php:197
+#: includes/class-oli-acr-privacy.php:201
 msgid "Abandoned cart reminders"
 msgstr ""
 
-#: includes/class-oli-acr-privacy.php:198
+#: includes/class-oli-acr-privacy.php:202
 msgid "When you type your email address (and optionally your phone number and name) on our checkout page, we save it with the content of your cart, even if you do not complete the order. We use this information only to send you a limited number of reminder emails about your cart or unpaid order, sometimes with a single-use discount code."
 msgstr ""
 
-#: includes/class-oli-acr-privacy.php:199
+#: includes/class-oli-acr-privacy.php:203
 msgid "Every reminder contains an unsubscribe link. Carts are deleted automatically after the retention period set by the store, and reminders stop as soon as an order is placed. You can ask us to export or erase this data at any time."
 msgstr ""
 
@@ -873,83 +974,100 @@ msgstr ""
 msgid "Pending order recovered after a reminder (Oli Abandoned Cart Recovery)."
 msgstr ""
 
-#: includes/class-oli-acr-scheduler.php:52
+#: includes/class-oli-acr-scheduler.php:69
 msgid "Oli Abandoned Cart Recovery interval"
 msgstr ""
 
-#: includes/class-oli-acr-scheduler.php:348
+#. translators: 1: cart ID, 2: template ID, 3: attempt number, 4: error message, 5: next attempt or "none".
+#: includes/class-oli-acr-scheduler.php:299
+#, php-format
+msgid "Reminder for cart #%1$d (template %2$s) could not be sent, attempt %3$d: %4$s. Next attempt: %5$s."
+msgstr ""
+
+#: includes/class-oli-acr-scheduler.php:304
+#: includes/class-oli-acr-scheduler.php:524
+msgid "none (gave up)"
+msgstr ""
+
+#. translators: 1: order ID, 2: template ID, 3: attempt number, 4: error message, 5: next attempt or "none".
+#: includes/class-oli-acr-scheduler.php:519
+#, php-format
+msgid "Reminder for pending order #%1$d (template %2$s) could not be sent, attempt %3$d: %4$s. Next attempt: %5$s."
+msgstr ""
+
+#: includes/class-oli-acr-scheduler.php:642
 msgid "Pending order cancelled automatically by Oli Abandoned Cart Recovery (too old)."
 msgstr ""
 
-#: includes/class-oli-acr-templates.php:454
-#: includes/class-oli-acr-templates.php:477
-#: includes/class-oli-acr-templates.php:493
-#: includes/class-oli-acr-templates.php:510
+#: includes/class-oli-acr-templates.php:457
+#: includes/class-oli-acr-templates.php:480
+#: includes/class-oli-acr-templates.php:496
+#: includes/class-oli-acr-templates.php:513
 msgid "Hi {first_name},"
 msgstr ""
 
-#: includes/class-oli-acr-templates.php:454
+#: includes/class-oli-acr-templates.php:457
 msgid "Your items are still available. Use this single-use code at checkout:"
 msgstr ""
 
-#: includes/class-oli-acr-templates.php:468
+#: includes/class-oli-acr-templates.php:471
 msgid "Cart reminder #1"
 msgstr ""
 
-#: includes/class-oli-acr-templates.php:475
+#: includes/class-oli-acr-templates.php:478
 msgid "You left something in your cart"
 msgstr ""
 
-#: includes/class-oli-acr-templates.php:476
+#: includes/class-oli-acr-templates.php:479
 msgid "Your cart is waiting for you"
 msgstr ""
 
-#: includes/class-oli-acr-templates.php:477
+#: includes/class-oli-acr-templates.php:480
 msgid "Looks like you got interrupted. We saved the items in your cart:"
 msgstr ""
 
-#: includes/class-oli-acr-templates.php:477
+#: includes/class-oli-acr-templates.php:480
 msgid "Thank you,"
 msgstr ""
 
-#: includes/class-oli-acr-templates.php:484
+#: includes/class-oli-acr-templates.php:487
 msgid "Cart reminder #2 (coupon)"
 msgstr ""
 
-#: includes/class-oli-acr-templates.php:491
+#: includes/class-oli-acr-templates.php:494
 msgid "A little something to complete your order"
 msgstr ""
 
-#: includes/class-oli-acr-templates.php:492
+#: includes/class-oli-acr-templates.php:495
 msgid "Here is 10% off your cart"
 msgstr ""
 
-#: includes/class-oli-acr-templates.php:493
+#: includes/class-oli-acr-templates.php:496
 msgid "Your items are still available."
 msgstr ""
 
-#: includes/class-oli-acr-templates.php:501
+#: includes/class-oli-acr-templates.php:504
 msgid "Pending order reminder"
 msgstr ""
 
-#: includes/class-oli-acr-templates.php:508
+#: includes/class-oli-acr-templates.php:511
 msgid "Your order #{order_number} is awaiting payment"
 msgstr ""
 
-#: includes/class-oli-acr-templates.php:509
+#: includes/class-oli-acr-templates.php:512
 msgid "Complete your payment"
 msgstr ""
 
-#: includes/class-oli-acr-templates.php:510
+#: includes/class-oli-acr-templates.php:513
 msgid "Your order #{order_number} was not paid yet. You can complete the payment here:"
 msgstr ""
 
-#: includes/class-oli-acr-templates.php:511
+#: includes/class-oli-acr-templates.php:514
 msgid "Pay for my order"
 msgstr ""
 
 #. translators: {coupon_amount} is a placeholder replaced by the discount (e.g. 10 % or $5.00). Keep it as is.
-#: includes/class-oli-acr-templates.php:528
+#: includes/class-oli-acr-templates.php:531
 msgid "Use this code to get {coupon_amount} off your order:"
 msgstr ""
 
@@ -979,41 +1097,46 @@ msgstr ""
 msgid "Save my email and cart so the store can remind me about my order."
 msgstr ""
 
-#: includes/functions.php:231
+#: includes/functions.php:283
 msgid "Minutes"
 msgstr ""
 
-#: includes/functions.php:232
+#: includes/functions.php:284
 msgid "Hours"
 msgstr ""
 
-#: includes/functions.php:233
+#: includes/functions.php:285
 msgid "Days"
 msgstr ""
 
-#: includes/functions.php:296
+#: includes/functions.php:348
 msgctxt "cart status"
 msgid "Active"
 msgstr ""
 
-#: includes/functions.php:297
+#: includes/functions.php:349
 msgctxt "cart status"
 msgid "Abandoned"
 msgstr ""
 
-#: includes/functions.php:298
+#: includes/functions.php:350
 msgctxt "cart status"
 msgid "Reminded"
 msgstr ""
 
-#: includes/functions.php:299
+#: includes/functions.php:351
 msgctxt "cart status"
 msgid "Recovered"
 msgstr ""
 
-#: includes/functions.php:300
+#: includes/functions.php:352
 msgctxt "cart status"
 msgid "Unsubscribed"
+msgstr ""
+
+#: includes/functions.php:353
+msgctxt "cart status"
+msgid "Send failed"
 msgstr ""
 
 #: oli-abandoned-cart-recovery.php:92

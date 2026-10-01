@@ -1,6 +1,6 @@
 # Oli Abandoned Cart Recovery
 
-Extension WooCommerce légère de récupération des **paniers abandonnés** et des **commandes en attente**. Le courriel est capturé dès qu'il est tapé au checkout (classique **et** en blocs), même pour un visiteur qui ne passe jamais de commande. Une séquence de relances part ensuite, avec des coupons uniques, un lien de récupération sécurisé, un lien de désabonnement et des rapports.
+Extension WooCommerce légère de récupération des **paniers abandonnés** et des **commandes en attente**. Une fois la case de consentement cochée, le courriel et le panier sont enregistrés au checkout (classique **et** en blocs), même pour un visiteur qui ne passe jamais de commande. Une séquence de relances part ensuite, avec des coupons uniques, un lien de récupération sécurisé, un lien de désabonnement et des rapports.
 
 - **Slug / text domain :** `oli-abandoned-cart-recovery`
 - **Préfixe :** `oli_acr_` / `OLI_ACR_` (fonctions, options, tables, crochets, constantes)
@@ -15,7 +15,10 @@ Extension WooCommerce légère de récupération des **paniers abandonnés** et 
 - Un seul écouteur délégué sur le document : fonctionne avec le checkout classique (`#billing_email`) et en blocs (`#email`).
 - Téléphone, prénom et nom captés avec le courriel.
 - Clients connectés : panier mis à jour à chaque changement (`woocommerce_cart_updated`, comparaison d'empreinte pour éviter les écritures inutiles).
-- **Consentement d'abord (défaut depuis 1.0.1, Loi 25 / RGPD)** : pour un visiteur non connecté, rien n'est transmis ni enregistré (ni courriel, ni téléphone, ni panier) tant que la case de consentement n'est pas cochée (classique et blocs). Le texte par défaut suit la langue du visiteur ; un texte personnalisé est possible. Modes « toujours » et « jamais » offerts dans les réglages ; une installation 1.0.0 garde le mode déjà enregistré.
+- **Consentement d'abord (Loi 25 / RGPD)** : interrupteur unique « Exiger le consentement », activé par défaut, qui vaut pour les invités **et** les clients connectés. Tant que la case n'est pas cochée, rien n'est transmis ni enregistré (ni courriel, ni téléphone, ni panier) et aucune relance ne part. Le consentement d'un client connecté est mémorisé dans sa fiche (méta `_oli_acr_consent`), case précochée et retirable. Interrupteur désactivé : invités et clients connectés suivis sans case, avertissement permanent dans l'admin (Loi 25, RGPD, responsabilité de l'installateur). Option « jamais » pour les invités. Mise à jour depuis 1.0.x en mode « toujours » : passage au consentement (interrupteur activé) avec un avis jusqu'à fermeture ; les paniers de clients connectés captés sans case par la 1.0.x ne sont plus relancés.
+- **Texte de consentement avec liens** : éditeur par langue (`wp_editor` minimal), enregistré avec `wp_kses` (liens `href`/`target`/`rel`, `strong`, `em`). Champ vide = texte par défaut traduisible. Au checkout en blocs (libellé texte seulement), le script remplace le libellé par la version HTML filtrée.
+- **Échecs d'envoi** : statut « Échec d'envoi », cause (`wp_mail_failed`), nouveaux essais après 5 min, 30 min et 2 h (`oli_acr_retry_delays`), avis admin, journal WooCommerce niveau `error` même sans `WP_DEBUG` (`oli_acr_log_errors`).
+- **Robustesse** : verrou atomique en option (`oli_acr_process_lock`, durée `oli_acr_lock_ttl`, 10 min, renouvelé) avec budget de temps (`oli_acr_time_budget`) et réclamation de chaque panier avant l'envoi ; compatible stockage des commandes sans HPOS ; partie texte (multipart/alternative) ; limites de débit de la capture (`oli_acr_capture_rate_limits`, IP via `oli_acr_client_ip`) et piège à robots ; nonce frais (`?wc-ajax=oli_acr_nonce`) si la page est en cache, pages de paiement en no-cache (`DONOTCACHEPAGE`).
 - Choix des rôles suivis.
 - Photo du panier : produits, quantités, variations, total, devise et langue, reliée à la session WooCommerce et à un jeton de 32 caractères.
 
