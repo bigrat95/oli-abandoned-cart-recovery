@@ -151,7 +151,6 @@ class OLI_ACR_Scheduler {
 			$current = (string) $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", self::LOCK_OPTION ) );
 			$parts   = explode( '|', $current );
 			if ( isset( $parts[1] ) && (int) $parts[1] > time() ) {
-				// phpcs:enable
 				return false;
 			}
 			// Verrou expiré : un seul processus peut le remplacer.
