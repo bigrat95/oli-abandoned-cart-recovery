@@ -287,6 +287,39 @@ function oli_acr_duration_units() {
 }
 
 /**
+ * Durée lisible, au singulier ou au pluriel selon la valeur (« 1 hour », « 2 hours », « 1 heure »).
+ *
+ * @param array<mixed> $duration Durée (value, unit).
+ * @return string
+ */
+function oli_acr_duration_label( $duration ) {
+	$value = is_array( $duration ) && isset( $duration['value'] ) ? absint( $duration['value'] ) : absint( $duration );
+	$unit  = is_array( $duration ) && isset( $duration['unit'] ) ? (string) $duration['unit'] : 'minutes';
+	switch ( $unit ) {
+		case 'days':
+			/* translators: %d: number of days. */
+			return sprintf( _n( '%d day', '%d days', $value, 'oli-abandoned-cart-recovery' ), $value );
+		case 'hours':
+			/* translators: %d: number of hours. */
+			return sprintf( _n( '%d hour', '%d hours', $value, 'oli-abandoned-cart-recovery' ), $value );
+		default:
+			/* translators: %d: number of minutes. */
+			return sprintf( _n( '%d minute', '%d minutes', $value, 'oli-abandoned-cart-recovery' ), $value );
+	}
+}
+
+/**
+ * Date et heure dans le format et le fuseau du site (Réglages > Général), traduites.
+ *
+ * @param int $timestamp Horodatage Unix (UTC).
+ * @return string
+ */
+function oli_acr_format_datetime( $timestamp ) {
+	$format = trim( get_option( 'date_format', 'Y-m-d' ) . ' ' . get_option( 'time_format', 'H:i' ) );
+	return date_i18n( '' !== $format ? $format : 'Y-m-d H:i', (int) $timestamp + (int) round( (float) get_option( 'gmt_offset' ) * HOUR_IN_SECONDS ) );
+}
+
+/**
  * Convertit une durée (valeur + unité) en secondes.
  *
  * @param array<mixed>|int $duration Durée.
@@ -575,5 +608,5 @@ function oli_acr_admin_date( $date ) {
 	if ( empty( $date ) ) {
 		return '—';
 	}
-	return esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), strtotime( $date . ' UTC' ) ) );
+	return esc_html( oli_acr_format_datetime( (int) strtotime( $date . ' UTC' ) ) );
 }

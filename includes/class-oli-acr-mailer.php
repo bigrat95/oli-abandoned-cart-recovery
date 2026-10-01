@@ -693,6 +693,16 @@ class OLI_ACR_Mailer {
 		if ( 'yes' !== $tpl['coupon_enabled'] || (float) $tpl['coupon_amount'] <= 0 ) {
 			return '';
 		}
+		/**
+		 * B4 : pas de coupon si le courriel ne montre pas son code ({coupon} ou {coupon_code}) : il serait créé
+		 * pour rien et le client ne le verrait jamais. Le filtre permet de forcer la création (usage avancé).
+		 *
+		 * @param bool         $create Créer le coupon.
+		 * @param array<mixed> $tpl    Modèle résolu dans la langue du courriel.
+		 */
+		if ( ! apply_filters( 'oli_acr_create_coupon', OLI_ACR_Templates::shows_coupon( $tpl ), $tpl ) ) {
+			return '';
+		}
 		$prefix = strtoupper( preg_replace( '/[^A-Za-z0-9\-_]/', '', (string) oli_acr_get_setting( 'coupon_prefix' ) ) );
 		$code   = ( '' !== $prefix ? $prefix . '-' : '' ) . strtoupper( wp_generate_password( 8, false, false ) );
 		/**

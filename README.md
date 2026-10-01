@@ -21,6 +21,9 @@ Extension WooCommerce légère de récupération des **paniers abandonnés** et 
   |---|---|---|
   | **Activé** (par défaut) | Case à cocher ; rien n'est capté ni relancé sans elle | Case à cocher (précochée si déjà consenti, méta `_oli_acr_consent`) ; rien n'est suivi ni relancé sans consentement ; décocher efface la méta et le panier |
   | **Désactivé** (avertissement Loi 25 / RGPD permanent) | Capté et relancé sans case | Suivi et relancé sans case |
+
+  Colonne `consent` du panier : 1 **seulement** pour une case réellement cochée (ou la méta d'un client connecté). Capté avec l'interrupteur OFF : `consent=0`, donc jamais relancé si on le rallume. Migration depuis 1.0.x : `consent=0` pour les paniers des clients connectés et, en mode « toujours », pour ceux des invités (`OLI_ACR_Install::reset_legacy_consent()`). Les relances de commandes en attente ne dépendent pas du consentement (décision d'Olivier).
+- **Coupon** : créé seulement si le courriel (dans sa langue) contient `{coupon}` ou `{coupon_code}` ; sinon avertissement dans la liste et l'éditeur des modèles (filtre `oli_acr_create_coupon`).
 - **Texte de consentement avec liens** : éditeur par langue (`wp_editor` minimal), enregistré avec `wp_kses` (liens `href`/`target`/`rel`, `strong`, `em`). Champ vide = texte par défaut traduisible. Au checkout en blocs (libellé texte seulement), le script remplace le libellé par la version HTML filtrée.
 - **Échecs d'envoi** : statut « Échec d'envoi », cause (`wp_mail_failed`), nouveaux essais après 5 min, 30 min et 2 h (`oli_acr_retry_delays`), avis admin, journal WooCommerce niveau `error` même sans `WP_DEBUG` (`oli_acr_log_errors`).
 - **Robustesse** : verrou atomique en option (`oli_acr_process_lock`, durée `oli_acr_lock_ttl`, 10 min, renouvelé) avec budget de temps (`oli_acr_time_budget`) et réclamation de chaque panier avant l'envoi ; compatible stockage des commandes sans HPOS ; partie texte (multipart/alternative) ; limites de débit de la capture (`oli_acr_capture_rate_limits`, IP via `oli_acr_client_ip`) et piège à robots ; nonce frais (`?wc-ajax=oli_acr_nonce`) si la page est en cache, pages de paiement en no-cache (`DONOTCACHEPAGE`).
@@ -29,6 +32,7 @@ Extension WooCommerce légère de récupération des **paniers abandonnés** et 
 
 ### Multilingue (1.1.0)
 - **Adaptateurs** (`includes/lang/`) : classe de base `OLI_ACR_Lang_Adapter` ; `OLI_ACR_Lang_WPML`, `_Polylang`, `_TranslatePress`, `_Weglot`, `_Core`. Priorité : WPML, Polylang, TranslatePress, Weglot, puis le cœur. Filtre `oli_acr_lang_adapters` pour en ajouter ou en retirer. Toutes les langues sont des locales WordPress (`fr_CA`, `en_US`).
+- **Polylang gratuit** : WooCommerce ne reconnaît pas les pages panier et paiement traduites ; sans « Polylang for WooCommerce » (ou le filtre `woocommerce_get_checkout_page_id` / `woocommerce_get_cart_page_id` donné dans la FAQ du readme), aucun panier n'est capté dans les autres langues. Un avis admin (`oli-acr-polylang-wc`) l'indique tant que rien ne relie ces pages (filtre `oli_acr_polylang_checkout_bridged`).
 - **Modèles par langue** : `texts[locale] = {name, subject, heading, content, button_label}` ; les champs de premier niveau sont le miroir de la langue de repli (compatibilité 1.0.x et filtres). Délai, coupon, type et statut sont communs.
 - **Consentement par langue** : réglage `consent_texts[locale]` (`consent_text` = miroir de la langue de repli).
 - **Langue de repli** : réglage `fallback_language` (vide = langue par défaut du site ou de l'extension).

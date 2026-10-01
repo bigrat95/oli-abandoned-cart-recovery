@@ -33,7 +33,7 @@ It works with the **classic checkout** and the **block checkout**, is compatible
 
 * **Templates per language** — each template has its own texts (name, subject, heading, content, button) for every active language, edited in language tabs; delay, coupon and status are shared
 * **Consent text per language**
-* **Works with** TranslatePress, Polylang, WPML and Weglot (and a single-language site); other plugins can be added with the `oli_acr_lang_adapters` filter
+* **Works with** TranslatePress, Polylang (with *Polylang for WooCommerce*, or the short snippet in the FAQ), WPML and Weglot (and a single-language site); other plugins can be added with the `oli_acr_lang_adapters` filter
 * **Sent in the cart's language** — the language of the checkout page is saved with the cart; recovery and unsubscribe links point to the URL of that language, and the recovery link opens the checkout page of that language
 * **Adjustable fallback language** for carts in an unknown or deactivated language
 * **WPML String Translation and Polylang strings** — texts of the fallback language are registered, so they can also be translated there
@@ -46,7 +46,7 @@ It works with the **classic checkout** and the **block checkout**, is compatible
 * **Placeholders** — `{first_name}`, `{last_name}`, `{full_name}`, `{email}`, `{cart_items}`, `{cart_total}`, `{recovery_link}`, `{recovery_button}`, `{coupon}`, `{coupon_code}`, `{unsubscribe_link}`, `{site_name}`, `{site_url}`, `{order_number}`, `{order_date}`
 * **WooCommerce email look** — messages are wrapped in the WooCommerce email template (colors, header, footer), with a plain-text part (multipart/alternative)
 * **Retries after a failed send** — a failed reminder gets the *Send failed* status and is retried after 5 minutes, 30 minutes and 2 hours (`oli_acr_retry_delays` filter); the cause is shown in the admin and logged in WooCommerce > Status > Logs, even without `WP_DEBUG`
-* **Unique coupons** — optional single-use coupon per reminder (prefix, percentage or fixed amount, validity), restricted to the customer's email and applied automatically when the recovery link is clicked
+* **Unique coupons** — optional single-use coupon per reminder (prefix, percentage or fixed amount, validity), restricted to the customer's email and applied automatically when the recovery link is clicked; created only when the email shows it (`{coupon}` or `{coupon_code}`)
 * **Coupon clean-up** — used and expired generated coupons are moved to the trash daily
 * **Pending orders** — reminders for unpaid orders with their own delay and templates, with a secure "pay for order" link
 * **Send a test** — send any template to the address of your choice
@@ -91,6 +91,15 @@ It works with the **classic checkout** and the **block checkout**, is compatible
 
 Yes: TranslatePress, Polylang, WPML and Weglot are detected automatically (in that order of priority: WPML, Polylang, TranslatePress, Weglot, then WordPress itself). The language of the checkout page is saved with the cart, the reminder is sent in that language, and its links open the store in that language. Under Abandoned Carts > Email templates, each template has one tab per active language.
 
+= Polylang: what do I need? =
+
+Free Polylang alone translates the pages, but WooCommerce does not recognize the translated cart and checkout pages: on those pages the capture script is not loaded and **no cart is saved** in the other languages. Install **Polylang for WooCommerce**, or link the translated pages to WooCommerce with this snippet (in a small plugin or your theme's `functions.php`):
+
+`add_filter( 'woocommerce_get_checkout_page_id', function ( $id ) { return function_exists( 'pll_get_post' ) && pll_get_post( $id ) ? pll_get_post( $id ) : $id; } );`
+`add_filter( 'woocommerce_get_cart_page_id', function ( $id ) { return function_exists( 'pll_get_post' ) && pll_get_post( $id ) ? pll_get_post( $id ) : $id; } );`
+
+Until one of them is in place, the plugin shows an admin notice.
+
 = Which text is used for a language? =
 
 For each field, in this order: the text written in that language's tab; the WPML String Translation or Polylang string translation of the fallback language text; the default text translated in that language (if the fallback text is still the default one); then the fallback language text. The same order applies to the consent text.
@@ -130,11 +139,11 @@ No. The capture request only runs on the checkout page. Detection and sending ru
 
 = Are customers tracked without consent? =
 
-No, not by default. The **Require consent** switch is on by default and applies to guests and to logged-in customers: until the box is ticked, nothing is sent to the server or saved (no email, phone or cart), and no reminder is sent. A logged-in customer who ticked the box once is remembered (the box is shown ticked and can be unticked to withdraw consent). This follows Quebec's Law 25 and the GDPR, which require express consent before collecting personal information for marketing reminders. You can turn the switch off in Settings — guests and logged-in customers are then tracked without the box — but you become responsible for having another legal basis, and a warning stays in the admin. You can also choose to never track guests.
+No, not by default. The **Require consent** switch is on by default and applies to guests and to logged-in customers: until the box is ticked, nothing is sent to the server or saved (no email, phone or cart), and no reminder is sent. A logged-in customer who ticked the box once is remembered (the box is shown ticked and can be unticked to withdraw consent). This follows Quebec's Law 25 and the GDPR, which require express consent before collecting personal information for marketing reminders. You can turn the switch off in Settings — guests and logged-in customers are then tracked without the box — but you become responsible for having another legal basis, and a warning stays in the admin. Carts saved while the switch is off are marked as captured without consent: if you turn the switch back on, they are not reminded (unless the customer ticks the box later). You can also choose to never track guests. Reminders for pending (unpaid) orders do not depend on this switch.
 
 = I upgraded from 1.0.x and my store was in "Always" mode. What changed? =
 
-Version 1.1.0 turns consent on for these stores (the switch is on) and shows an admin notice until you dismiss it. Carts of logged-in customers captured by 1.0.x without the box are no longer reminded until the customer consents. You can turn consent off again in Settings, under your own responsibility.
+Version 1.1.0 turns consent on for these stores (the switch is on) and shows an admin notice until you dismiss it. Carts captured by 1.0.x without the box (guest carts in "Always" mode, and all logged-in customers' carts) are marked as captured without consent and are no longer reminded until the customer ticks the box. You can turn consent off again in Settings, under your own responsibility.
 
 = What happens when an email cannot be sent? =
 
@@ -170,7 +179,7 @@ The plugin stores, in the store's own database: the email, phone, first and last
 * New: consent switch (on by default) that applies to guests and logged-in customers; when off, a permanent Law 25 / GDPR warning is shown in the admin
 * New: consent text edited per language with links, bold and italic (`wp_kses`)
 * Privacy: logged-in customers must also tick the consent box (consent remembered in their account, withdrawable); 1.0.x logged-in carts without consent are no longer reminded
-* Privacy: stores upgraded from 1.0.x in "Always" mode switch to consent, with an admin notice
+* Privacy: stores upgraded from 1.0.x in "Always" mode switch to consent, with an admin notice; carts captured without the box (by 1.0.x, or in 1.1.0 while the switch is off) are never reminded once consent is required
 * New: retries after a failed send (5 min, 30 min, 2 h) with the *Send failed* status, the error in the carts list, an admin notice and an error log entry, even without `WP_DEBUG`
 * New: plain-text part in reminder emails (multipart/alternative)
 * New: rate limits and honeypot on the capture endpoint
@@ -183,6 +192,9 @@ The plugin stores, in the store's own database: the email, phone, first and last
 * New: reminders sent in the cart's language (language of the checkout page); recovery and unsubscribe links use the URL of that language, the recovery link opens the checkout page of that language, and the unsubscribe page is shown in that language
 * New: adjustable fallback language
 * New: fallback language texts registered in WPML String Translation and Polylang; documented priority order
+* Fix: no coupon is created when the email does not show it (no `{coupon}` or `{coupon_code}`), with a warning in the template list and editor
+* New: notice when Polylang is active without Polylang for WooCommerce (translated checkout pages not recognized)
+* Fix: "1 hour" / "1 hours" plurals and the date of the failure notice in the site's date and time format
 * New: `{coupon_amount}` placeholder and a translatable coupon introduction sentence in the default templates (removed when there is no coupon)
 * New: `oli_acr_translate_url` filter
 * Fix: with the site in English, the admin showed template names, subjects and content in French (list, editor, log, "Send a test"); the admin now shows templates in the admin language or in the selected language tab, and "Send a test" uses that language

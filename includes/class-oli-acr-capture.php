@@ -176,7 +176,9 @@ class OLI_ACR_Capture {
 				'phone'      => isset( $_POST['phone'] ) ? wc_sanitize_phone_number( sanitize_text_field( wp_unslash( $_POST['phone'] ) ) ) : '',
 				'first_name' => isset( $_POST['first_name'] ) ? sanitize_text_field( wp_unslash( $_POST['first_name'] ) ) : '',
 				'last_name'  => isset( $_POST['last_name'] ) ? sanitize_text_field( wp_unslash( $_POST['last_name'] ) ) : '',
-				'consent'    => 'consent' === $mode ? $consent : true,
+				// B1 (Loi 25) : consent=1 seulement pour une case réellement cochée (ou le consentement mémorisé d'un
+				// client connecté). Interrupteur OFF : capté sans case, donc consent=0 ; jamais relancé si on le rallume.
+				'consent'    => 'consent' === $mode ? $consent : ( $user_id && oli_acr_user_has_consent( $user_id ) ),
 				'user_id'    => $user_id,
 				'language'   => $language,
 			)
@@ -349,7 +351,8 @@ class OLI_ACR_Capture {
 						'last_name'  => $user->last_name,
 						'phone'      => get_user_meta( $user_id, 'billing_phone', true ),
 						'user_id'    => $user_id,
-						'consent'    => ! oli_acr_consent_required() || oli_acr_user_has_consent( $user_id ),
+						// B1 : consentement explicite seulement (méta), même quand l'interrupteur est OFF.
+						'consent'    => oli_acr_user_has_consent( $user_id ),
 					)
 				);
 			}

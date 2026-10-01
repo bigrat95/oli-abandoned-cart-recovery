@@ -197,7 +197,8 @@ class OLI_ACR_Carts {
 			$sid = absint( WC()->session->get( self::SESSION_KEY ) );
 			if ( $sid ) {
 				$row = self::get( $sid );
-				if ( $row && in_array( $row->status, self::LIVE_STATUSES, true ) ) {
+				// Panier d'un autre client connecté : jamais repris par cette session.
+				if ( $row && in_array( $row->status, self::LIVE_STATUSES, true ) && in_array( (int) $row->user_id, array( 0, get_current_user_id() ), true ) ) {
 					$existing = $row;
 				}
 			}

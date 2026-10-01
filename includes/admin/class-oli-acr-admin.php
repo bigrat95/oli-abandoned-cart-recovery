@@ -587,6 +587,10 @@ class OLI_ACR_Admin {
 		} else {
 			$new['guest_tracking'] = isset( $raw['guest_tracking'] ) && in_array( $raw['guest_tracking'], array( 'always', 'consent', 'never' ), true ) ? $raw['guest_tracking'] : 'consent';
 		}
+		if ( 'always' === $new['guest_tracking'] ) {
+			// B3 : interrupteur éteint par le marchand, l'avis « le consentement est maintenant exigé » n'a plus lieu d'être.
+			delete_option( 'oli_acr_notice_consent_migrated' );
+		}
 		$new['fallback_language'] = isset( $raw['fallback_language'] ) && in_array( $raw['fallback_language'], OLI_ACR_Lang::adapter()->languages(), true ) ? (string) $raw['fallback_language'] : '';
 		$new['consent_texts']     = array();
 		$submitted_consent        = isset( $raw['consent_texts'] ) && is_array( $raw['consent_texts'] ) ? $raw['consent_texts'] : array();
@@ -658,7 +662,6 @@ class OLI_ACR_Admin {
 			)
 		) . '">' . esc_html__( 'Add template', 'oli-abandoned-cart-recovery' ) . '</a></p>';
 		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Name', 'oli-abandoned-cart-recovery' ) . '</th><th>' . esc_html__( 'Type', 'oli-abandoned-cart-recovery' ) . '</th><th>' . esc_html__( 'Send after', 'oli-abandoned-cart-recovery' ) . '</th><th>' . esc_html__( 'Coupon', 'oli-abandoned-cart-recovery' ) . '</th><th>' . esc_html__( 'Status', 'oli-abandoned-cart-recovery' ) . '</th><th></th></tr></thead><tbody>';
-		$units = oli_acr_duration_units();
 		foreach ( $templates as $id => $tpl ) {
 			$tpl    = OLI_ACR_Templates::for_locale( (string) $id, $tpl, $lang );
 			$delete = wp_nonce_url( admin_url( 'admin-post.php?action=oli_acr_delete_template&template=' . $id ), 'oli_acr_delete_template' );
@@ -676,8 +679,8 @@ class OLI_ACR_Admin {
 				esc_html( $tpl['name'] ),
 				esc_html( $tpl['subject'] ),
 				'order' === $tpl['type'] ? esc_html__( 'Pending order', 'oli-abandoned-cart-recovery' ) : esc_html__( 'Abandoned cart', 'oli-abandoned-cart-recovery' ),
-				esc_html( $tpl['delay']['value'] . ' ' . strtolower( $units[ $tpl['delay']['unit'] ] ) ),
-				'yes' === $tpl['coupon_enabled'] ? esc_html( wc_format_localized_decimal( $tpl['coupon_amount'] ) . ( 'percent' === $tpl['coupon_type'] ? ' %' : ' ' . get_woocommerce_currency_symbol() ) ) : '—',
+				esc_html( oli_acr_duration_label( $tpl['delay'] ) ),
+				'yes' === $tpl['coupon_enabled'] ? esc_html( wc_format_localized_decimal( $tpl['coupon_amount'] ) . ( 'percent' === $tpl['coupon_type'] ? ' %' : ' ' . get_woocommerce_currency_symbol() ) ) . wp_kses_post( self::coupon_missing_warning( (string) $id, OLI_ACR_Templates::get( (string) $id ) ) ) : '—',
 				'yes' === $tpl['active'] ? '<mark class="oli-acr-status oli-acr-status-recovered">' . esc_html__( 'Active', 'oli-abandoned-cart-recovery' ) . '</mark>' : '<mark class="oli-acr-status">' . esc_html__( 'Inactive', 'oli-abandoned-cart-recovery' ) . '</mark>',
 				esc_url(
 					self::url(
@@ -846,6 +849,7 @@ class OLI_ACR_Admin {
 		printf( '<input type="number" step="0.01" min="0" class="small-text" name="t[coupon_amount]" value="%s"> ', esc_attr( $tpl['coupon_amount'] ) );
 		echo '<select name="t[coupon_type]"><option value="percent"' . selected( 'percent', $tpl['coupon_type'], false ) . '>' . esc_html__( 'Percentage discount', 'oli-abandoned-cart-recovery' ) . '</option><option value="fixed_cart"' . selected( 'fixed_cart', $tpl['coupon_type'], false ) . '>' . esc_html__( 'Fixed cart discount', 'oli-abandoned-cart-recovery' ) . '</option></select> ';
 		printf( '%s <input type="number" min="0" class="small-text" name="t[coupon_validity]" value="%d"> %s', esc_html__( 'valid for', 'oli-abandoned-cart-recovery' ), (int) $tpl['coupon_validity'], esc_html__( 'days (0 = no expiry)', 'oli-abandoned-cart-recovery' ) );
+		echo wp_kses_post( self::coupon_missing_warning( (string) $tpl['id'], $tpl ) );
 		echo '</td></tr></table>';
 		submit_button( __( 'Save template', 'oli-abandoned-cart-recovery' ) );
 		echo '</form>';
@@ -933,6 +937,49 @@ class OLI_ACR_Admin {
 	}
 
 	/**
+	 * B2 : Polylang (gratuit) seul ne fait pas reconnaître les pages de paiement traduites par WooCommerce.
+	 * Aucun avis si « Polylang for WooCommerce » est actif ou si un filtre relie déjà la page de paiement.
+	 *
+	 * @return bool
+	 */
+	public static function polylang_needs_wc_bridge() {
+		if ( 'polylang' !== OLI_ACR_Lang::adapter()->id() || count( OLI_ACR_Lang::languages() ) < 2 ) {
+			return false;
+		}
+		$bridged = defined( 'PLLWC_VERSION' ) || function_exists( 'PLLWC' ) || has_filter( 'woocommerce_get_checkout_page_id' );
+		/**
+		 * Filtre : vrai si les pages de paiement traduites par Polylang sont reconnues par WooCommerce.
+		 *
+		 * @param bool $bridged Détection automatique.
+		 */
+		return ! apply_filters( 'oli_acr_polylang_checkout_bridged', $bridged );
+	}
+
+	/**
+	 * B4 : avertissement quand le coupon est activé mais que le courriel ne montre pas son code.
+	 *
+	 * @param string            $id  ID du modèle.
+	 * @param array<mixed>|null $tpl Modèle (non résolu).
+	 * @return string HTML (vide si tout va bien).
+	 */
+	public static function coupon_missing_warning( $id, $tpl ) {
+		if ( ! is_array( $tpl ) ) {
+			return '';
+		}
+		$missing = OLI_ACR_Templates::coupon_missing_locales( $id, $tpl );
+		if ( empty( $missing ) ) {
+			return '';
+		}
+		return '<p class="oli-acr-coupon-missing" style="color:#b32d2e"><strong>' . esc_html__( 'No coupon will be created:', 'oli-abandoned-cart-recovery' ) . '</strong> ' . esc_html(
+			sprintf(
+				/* translators: %s: list of languages. */
+				__( 'the email does not contain {coupon} or {coupon_code} (%s). Add one of these tags to the content to send the coupon.', 'oli-abandoned-cart-recovery' ),
+				implode( ', ', array_map( array( 'OLI_ACR_Lang', 'label' ), $missing ) )
+			)
+		) . '</p>';
+	}
+
+	/**
 	 * Avis généraux de l'administration (toutes les pages, utilisateurs autorisés seulement).
 	 *
 	 * - Consentement désactivé : avertissement permanent (Loi 25 et RGPD).
@@ -954,7 +1001,17 @@ class OLI_ACR_Admin {
 				esc_html__( 'Turn consent back on', 'oli-abandoned-cart-recovery' )
 			);
 		}
-		if ( get_option( 'oli_acr_notice_consent_migrated' ) ) {
+		if ( self::polylang_needs_wc_bridge() ) {
+			printf(
+				'<div class="notice notice-error oli-acr-polylang-wc"><p><strong>%1$s</strong> %2$s <a href="%3$s" target="_blank" rel="noopener noreferrer">%4$s</a></p></div>',
+				esc_html__( 'Oli Abandoned Cart Recovery: carts on translated checkout pages are not captured.', 'oli-abandoned-cart-recovery' ),
+				esc_html__( 'Polylang is active without "Polylang for WooCommerce", so WooCommerce does not recognize the translated checkout pages: the capture script is not loaded there and no cart is saved in those languages. Install "Polylang for WooCommerce", or link the translated cart and checkout pages to WooCommerce with the woocommerce_get_checkout_page_id filter (see the plugin FAQ).', 'oli-abandoned-cart-recovery' ),
+				esc_url( 'https://polylang.pro/downloads/polylang-for-woocommerce/' ),
+				esc_html__( 'Polylang for WooCommerce', 'oli-abandoned-cart-recovery' )
+			);
+		}
+		// B3 : jamais à côté de l'avertissement « consentement désactivé » (les deux messages se contrediraient).
+		if ( get_option( 'oli_acr_notice_consent_migrated' ) && oli_acr_consent_required() ) {
 			printf(
 				'<div class="notice notice-warning oli-acr-consent-migrated"><p><strong>%1$s</strong> %2$s <a href="%3$s">%4$s</a> | <a href="%5$s">%6$s</a></p></div>',
 				esc_html__( 'Oli Abandoned Cart Recovery 1.1.0: consent is now required.', 'oli-abandoned-cart-recovery' ),
@@ -970,8 +1027,8 @@ class OLI_ACR_Admin {
 			printf(
 				'<div class="notice notice-error oli-acr-mail-failure"><p><strong>%1$s</strong> %2$s <code>%3$s</code> %4$s <a href="%5$s">%6$s</a> | <a href="%7$s">%8$s</a> | <a href="%9$s">%10$s</a></p></div>',
 				esc_html__( 'Oli Abandoned Cart Recovery: some reminders could not be sent.', 'oli-abandoned-cart-recovery' ),
-				/* translators: 1: number of failures, 2: date of the last failure. */
-				esc_html( sprintf( __( '%1$d failure(s), last one on %2$s:', 'oli-abandoned-cart-recovery' ), (int) $failure['count'], wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $failure['time'] ) ) ),
+				/* translators: 1: number of failures, 2: date and time of the last failure (site format). */
+				esc_html( sprintf( _n( '%1$d failure, the last one: %2$s.', '%1$d failures, the last one: %2$s.', (int) $failure['count'], 'oli-abandoned-cart-recovery' ), (int) $failure['count'], oli_acr_format_datetime( (int) $failure['time'] ) ) ) . ' ' . esc_html__( 'Error:', 'oli-abandoned-cart-recovery' ),
 				esc_html( (string) $failure['error'] ),
 				esc_html__( 'Failed reminders are retried automatically. Check your mail settings (SMTP).', 'oli-abandoned-cart-recovery' ),
 				esc_url( self::url( 'carts', array( 'status' => 'failed' ) ) ),

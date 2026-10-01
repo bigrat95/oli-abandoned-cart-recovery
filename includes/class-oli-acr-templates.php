@@ -213,6 +213,42 @@ class OLI_ACR_Templates {
 	const TEXT_FIELDS = array( 'name', 'subject', 'heading', 'content', 'button_label' );
 
 	/**
+	 * B4 : vrai si le modèle (déjà résolu dans une langue) montre le code du coupon ({coupon} ou {coupon_code}).
+	 *
+	 * @param array<mixed> $tpl Modèle résolu.
+	 * @return bool
+	 */
+	public static function shows_coupon( $tpl ) {
+		foreach ( array( 'subject', 'heading', 'content', 'button_label' ) as $field ) {
+			$text = isset( $tpl[ $field ] ) ? (string) $tpl[ $field ] : '';
+			if ( false !== strpos( $text, '{coupon}' ) || false !== strpos( $text, '{coupon_code}' ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * B4 : langues où le coupon est activé mais où le courriel ne montre pas le code (aucun coupon n'y est créé).
+	 *
+	 * @param string       $id  ID du modèle.
+	 * @param array<mixed> $tpl Modèle.
+	 * @return string[] Locales.
+	 */
+	public static function coupon_missing_locales( $id, $tpl ) {
+		if ( ! isset( $tpl['coupon_enabled'] ) || 'yes' !== $tpl['coupon_enabled'] || (float) ( isset( $tpl['coupon_amount'] ) ? $tpl['coupon_amount'] : 0 ) <= 0 ) {
+			return array();
+		}
+		$missing = array();
+		foreach ( OLI_ACR_Lang::languages() as $locale ) {
+			if ( ! self::shows_coupon( self::for_locale( (string) $id, $tpl, $locale ) ) ) {
+				$missing[] = $locale;
+			}
+		}
+		return $missing;
+	}
+
+	/**
 	 * Champs qui forment le courriel (comparés pour savoir si un modèle est encore celui par défaut).
 	 */
 	const MAIL_FIELDS = array( 'subject', 'heading', 'content', 'button_label' );
