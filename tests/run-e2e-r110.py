@@ -52,6 +52,9 @@ def reset(mode='consent'):
         opt(o, None)
     php('''
     global $wpdb; $wpdb->query("TRUNCATE {$wpdb->prefix}oli_acr_carts"); $wpdb->query("TRUNCATE {$wpdb->prefix}oli_acr_log");
+    // TRUNCATE remet les ID à 1 : les sessions WooCommerce persistantes (client connecté) gardent sinon un ancien
+    // ID de panier qui pointerait vers le panier d'un autre visiteur du test suivant.
+    $wpdb->query("DELETE FROM {$wpdb->prefix}woocommerce_sessions");
     $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient%oli_acr_rl_%'");
     update_option("oli_acr_blocklist", array());
     $s = oli_acr_default_settings();
