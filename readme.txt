@@ -89,7 +89,7 @@ It works with the **classic checkout** and the **block checkout**, is compatible
 
 = Is it compatible with multilingual plugins? =
 
-Yes: TranslatePress, Polylang, WPML and Weglot are detected automatically (in that order of priority: WPML, Polylang, TranslatePress, Weglot, then WordPress itself). The language of the checkout page is saved with the cart, the reminder is sent in that language, and its links open the store in that language. Under Abandoned Carts > Email templates, each template has one tab per active language.
+Yes: TranslatePress, Polylang, WPML and Weglot are detected automatically (in that order of priority: WPML, Polylang, TranslatePress, Weglot, then WordPress itself). The language of the checkout page is saved with the cart, the reminder is sent in that language, and its links open the store in that language. Under Abandoned Carts > Email templates, each template has one tab per active language. Polylang needs *Polylang for WooCommerce* or a short snippet: see "Polylang: what do I need?" below.
 
 = Polylang: what do I need? =
 
@@ -143,7 +143,11 @@ No, not by default. The **Require consent** switch is on by default and applies 
 
 = I upgraded from 1.0.x and my store was in "Always" mode. What changed? =
 
-Version 1.1.0 turns consent on for these stores (the switch is on) and shows an admin notice until you dismiss it. Carts captured by 1.0.x without the box (guest carts in "Always" mode, and all logged-in customers' carts) are marked as captured without consent and are no longer reminded until the customer ticks the box. You can turn consent off again in Settings, under your own responsibility.
+Version 1.1.0 turns consent on for these stores (the switch is on) and shows an admin notice until you dismiss it. You can turn consent off again in Settings, under your own responsibility.
+
+= Are carts saved by 1.0.x still reminded after the update? =
+
+No. Version 1.0.x did not record whether a cart was saved with the consent box ticked or in "Always" mode (a store may also have switched modes before updating). To be safe, every cart saved by 1.0.x — guests and logged-in customers — is marked as captured without consent and is not reminded until the customer ticks the box again in 1.1.0. Pending order reminders are not affected.
 
 = What happens when an email cannot be sent? =
 
@@ -167,11 +171,11 @@ The plugin stores, in the store's own database: the email, phone, first and last
 
 == Screenshots ==
 
-1. Dashboard with recovery stats and reports
-2. Abandoned carts list with status filters
-3. Email template editor with placeholders, coupon and test button
-4. Settings
-5. Reminder email received by the customer
+1. Dashboard: recovery stats (abandoned carts, emails sent, clicks, recovery rate, recovered revenue), report by day and report by template
+2. Abandoned carts list with status filters (active, abandoned, reminded, recovered, unsubscribed, send failed), including the error of a failed send
+3. Email template editor: language tabs, placeholders, unique coupon and "Send a test"
+4. Settings: the "Require consent" switch turned off, with the Quebec Law 25 / GDPR warning (consent is on by default)
+5. Cart reminder email received by the customer, with the cart items and the recovery button
 
 == Changelog ==
 
@@ -179,7 +183,7 @@ The plugin stores, in the store's own database: the email, phone, first and last
 * New: consent switch (on by default) that applies to guests and logged-in customers; when off, a permanent Law 25 / GDPR warning is shown in the admin
 * New: consent text edited per language with links, bold and italic (`wp_kses`)
 * Privacy: logged-in customers must also tick the consent box (consent remembered in their account, withdrawable); 1.0.x logged-in carts without consent are no longer reminded
-* Privacy: stores upgraded from 1.0.x in "Always" mode switch to consent, with an admin notice; carts captured without the box (by 1.0.x, or in 1.1.0 while the switch is off) are never reminded once consent is required
+* Privacy: stores upgraded from 1.0.x in "Always" mode switch to consent, with an admin notice; carts saved by 1.0.x (which did not record how consent was given) and carts captured in 1.1.0 while the switch is off are never reminded once consent is required, until the customer ticks the box
 * New: retries after a failed send (5 min, 30 min, 2 h) with the *Send failed* status, the error in the carts list, an admin notice and an error log entry, even without `WP_DEBUG`
 * New: plain-text part in reminder emails (multipart/alternative)
 * New: rate limits and honeypot on the capture endpoint
@@ -232,7 +236,7 @@ The plugin stores, in the store's own database: the email, phone, first and last
 == Upgrade Notice ==
 
 = 1.1.0 =
-Multilingual templates and consent text. Consent is now required for guests and logged-in customers (a store in "Always" mode switches to consent, with a notice). Failed reminders are retried.
+Multilingual templates and consent text. Consent is now required for guests and logged-in customers (a store in "Always" mode switches to consent, with a notice); carts saved by 1.0.x are no longer reminded until the customer consents again. Failed reminders are retried.
 
 
 = 1.0.1 =

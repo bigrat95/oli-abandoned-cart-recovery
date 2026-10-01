@@ -84,7 +84,7 @@ class OLI_ACR_Install {
 		$settings = get_option( 'oli_acr_settings' );
 		$legacy   = '' === $from || version_compare( $from, '1.1.0', '<' );
 		if ( $legacy ) {
-			self::reset_legacy_consent( is_array( $settings ) && isset( $settings['guest_tracking'] ) && 'always' === $settings['guest_tracking'] );
+			self::reset_legacy_consent();
 		}
 		if ( is_array( $settings ) ) {
 			// R2 (Loi 25, RGPD) : une installation 1.0.x en mode « toujours » repasse au consentement (interrupteur activé).
@@ -125,22 +125,23 @@ class OLI_ACR_Install {
 	}
 
 	/**
-	 * B1 (Loi 25) : la 1.0.x enregistrait consent=1 sans case cochée pour les invités en mode « toujours »
-	 * et pour tous les clients connectés. Ces paniers n'ont pas de consentement explicite : consent=0,
-	 * ils ne sont plus relancés tant que le client n'a pas coché la case (les relances de commandes
-	 * en attente ne dépendent pas de cette colonne).
+	 * B1 et N1 (Loi 25) : la 1.0.x enregistrait consent=1 sans case cochée pour les invités en mode « toujours »
+	 * et pour tous les clients connectés, et ne gardait pas la source du consentement. Un site passé du mode
+	 * « toujours » au mode consentement AVANT la mise à jour garde donc des paniers invités sans consentement
+	 * explicite, impossibles à distinguer des autres. Par prudence, tous les paniers 1.0.x (invités et clients
+	 * connectés) passent à consent=0 : ils ne sont plus relancés tant que le client n'a pas coché la case
+	 * dans la 1.1.0. Les relances de commandes en attente ne dépendent pas de cette colonne.
 	 *
-	 * @param bool $guests_too Le site était en mode « toujours » : les paniers invités sont aussi remis à 0.
 	 * @return void
 	 */
-	public static function reset_legacy_consent( $guests_too ) {
+	public static function reset_legacy_consent() {
 		global $wpdb;
 		$table = oli_acr_table( 'carts' );
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Nom de table construit par oli_acr_table(), jamais une saisie ; migration ponctuelle.
 		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) !== $table ) {
 			return;
 		}
-		$wpdb->query( $wpdb->prepare( "UPDATE {$table} SET consent = 0 WHERE consent = 1 AND user_id >= %d", $guests_too ? 0 : 1 ) );
+		$wpdb->query( "UPDATE {$table} SET consent = 0 WHERE consent = 1" );
 		// phpcs:enable
 	}
 

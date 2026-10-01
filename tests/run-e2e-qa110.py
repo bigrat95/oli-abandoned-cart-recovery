@@ -47,13 +47,27 @@ def t_b1():
     result('(B1) Migration 1.0.x « toujours » : paniers invité et connecté captés sans case passent à consent=0 et ne sont pas relancés',
            mode == 'consent' and consent_of(g) == '0' and consent_of(u) == '0' and cart(g)[1] == '0' and cart(u)[1] == '0'
            and not mails_to(f'b1-mig-g-{STAMP}@example.test') and not mails_to('cliente@example.com'), f'mode={mode} invité={cart(g)} connecté={cart(u)}')
-    # 2) Migration 1.0.x déjà en mode « consentement » : un invité qui avait coché la case reste consenti et relancé.
-    reset('consent')
-    g2 = due_cart(f'b1-mig-ok-{STAMP}@example.test', consent=1)
-    php('delete_option("oli_acr_version"); OLI_ACR_Install::maybe_upgrade();')
+    # 2) N1 : site passé du mode « toujours » au mode consentement AVANT la mise à jour. La 1.0.x ne garde pas la
+    #    source du consentement : tous les paniers 1.0.x passent à consent=0, aucune relance.
+    reset('always')
+    g_always = due_cart(f'n1-galways-{STAMP}@example.test', consent=1)   # capté sans case en mode « toujours »
+    php('$s = get_option("oli_acr_settings"); $s["guest_tracking"] = "consent"; update_option("oli_acr_settings", $s);')
+    g_box = due_cart(f'n1-gbox-{STAMP}@example.test', consent=1)         # capté avec case après le changement
+    php('delete_option("oli_acr_notice_consent_migrated"); delete_option("oli_acr_version"); OLI_ACR_Install::maybe_upgrade();')
+    php('do_action("oli_acr_process"); do_action("oli_acr_process");')
+    mode_n1 = php('echo oli_acr_get_setting("guest_tracking");')
+    result('(N1) Site passé de « toujours » à consentement AVANT la mise à jour : tous les paniers invités 1.0.x à consent=0, 0 relance',
+           mode_n1 == 'consent' and consent_of(g_always) == '0' and consent_of(g_box) == '0' and cart(g_always)[1] == '0' and cart(g_box)[1] == '0'
+           and not mails_to(f'n1-galways-{STAMP}@example.test') and not mails_to(f'n1-gbox-{STAMP}@example.test'), f'mode={mode_n1} toujours={cart(g_always)} case={cart(g_box)}')
+    # Le client revient et coche la case dans la 1.1.0 : de nouveau relancé.
+    c_n1 = Client(); c_n1.req('/?add-to-cart=10'); c_n1.capture_classic(f'n1-galways-{STAMP}@example.test', consent='1')
+    cid_n1 = sql(f"SELECT id FROM wp_oli_acr_carts WHERE email='n1-galways-{STAMP}@example.test'")[0][0]
+    make_due(f'id={cid_n1}')
     php('do_action("oli_acr_process");')
-    result('(B1) Migration 1.0.x en mode consentement : la case cochée en 1.0.x reste valable (consent=1, relance envoyée)',
-           consent_of(g2) == '1' and cart(g2)[1] == '1' and len(mails_to(f'b1-mig-ok-{STAMP}@example.test')) == 1, f'{cart(g2)}')
+    result('(N1) Après la mise à jour, le client coche la case : consent=1 et relance envoyée', consent_of(cid_n1) == '1' and len(mails_to(f'n1-galways-{STAMP}@example.test')) == 1, f'{cart(cid_n1)}')
+    # Déjà en 1.1.0 : aucune remise à zéro (un consentement 1.1.0 reste valable).
+    php('OLI_ACR_Install::maybe_upgrade(); OLI_ACR_Install::migrate();')
+    result('(N1) Remise à zéro faite une seule fois (depuis une 1.0.x) : un consentement donné en 1.1.0 reste à 1', consent_of(cid_n1) == '1', '')
     # 3) Interrupteur OFF : invité et connecté captés sans case => consent=0 ; relancés tant que OFF.
     reset('always')
     eg = f'b1-off-g-{STAMP}@example.test'
