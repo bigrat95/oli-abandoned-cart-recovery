@@ -263,7 +263,31 @@ def run_n1():
                'Use this code to get 10% off your order:' in c_en['HTML'] and 'Utilisez ce code pour obtenir 10 % de rabais sur votre commande :' in c_fr['HTML'].replace('&nbsp;', ' ')
                and c_en['HTML'].find('Use this code') < c_en['HTML'].find('TEST-COUPON') and mn and 'Use this code' not in hn and '{coupon_amount}' not in hn,
                f'en={"Use this code to get 10% off" in c_en["HTML"]} fr={"Utilisez ce code" in c_fr["HTML"]} sans_coupon={("Use this code" not in hn) if mn else None}')
+        # Variante QA : site en_US ET utilisateur en_US (locale de profil explicite).
+        php('update_user_meta(1, "locale", "en_US");')
+        ca2 = Client(); ca2.login('admin', 'admin')
+        _, lst2, _, _ = ca2.req('/wp-admin/admin.php?page=oli-acr&tab=templates')
+        result('(N1) Site en_US + profil admin en_US : liste des modèles en anglais', 'Cart reminder #1' in lst2 and not any(w in lst2 for w in fr_words), '')
+        # Variante : site resté fr_CA, profil admin en_US.
+        wp('site', 'switch-language', 'fr_CA')
+        ca3 = Client(); ca3.login('admin', 'admin')
+        _, lst3, _, _ = ca3.req('/wp-admin/admin.php?page=oli-acr&tab=templates')
+        _, edt3, _, _ = ca3.req('/wp-admin/admin.php?page=oli-acr&tab=templates&edit=tpl_cart_1')
+        result('(N1) Site fr_CA + profil admin en_US : modèles affichés en anglais (langue de l\'admin)',
+               'Cart reminder #1' in lst3 and not any(w in lst3 for w in fr_words) and 'You left something in your cart' in edt3, '')
+        php('update_user_meta(1, "locale", "");')
+        # Variante migration : données 1.0.x (modèles enregistrés en français, sans textes par langue), mise à jour, admin en_US.
+        php('''$t = oli_acr_in_locale("fr_CA", array("OLI_ACR_Templates", "legacy_default_templates"));
+        foreach ($t as $k => $x) { unset($t[$k]["texts"]); }
+        update_option("oli_acr_templates", $t); delete_option("oli_acr_version"); OLI_ACR_Install::maybe_upgrade();''')
+        wp('site', 'switch-language', 'en_US')
+        ca4 = Client(); ca4.login('admin', 'admin')
+        _, lst4, _, _ = ca4.req('/wp-admin/admin.php?page=oli-acr&tab=templates')
+        _, edt4, _, _ = ca4.req('/wp-admin/admin.php?page=oli-acr&tab=templates&edit=tpl_cart_1')
+        result('(N1) Mise à jour depuis des données 1.0.x créées en fr_CA, admin en_US : liste et éditeur en anglais',
+               'Cart reminder #1' in lst4 and not any(w in lst4 for w in fr_words) and 'You left something in your cart' in edt4, '')
     finally:
+        php('update_user_meta(1, "locale", "");')
         wp('site', 'switch-language', 'fr_CA')
 
 def main():

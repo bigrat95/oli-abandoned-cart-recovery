@@ -128,3 +128,51 @@ if ( 'polylang' === $oli_acr_stub ) {
 		} );
 	}
 }
+
+// Tests E2E : les suites créent des dizaines de paniers depuis 127.0.0.1 ; limites de débit relâchées,
+// sauf si l'option « oli_acr_test_rate_limits » vaut « default » (test R9 des valeurs par défaut).
+if ( 'default' !== get_option( 'oli_acr_test_rate_limits', '' ) ) {
+	add_filter(
+		'oli_acr_capture_rate_limits',
+		static function ( $limits ) {
+			return array_merge(
+				$limits,
+				array(
+					'ip_requests'    => 100000,
+					'ip_emails'      => 100000,
+					'session_emails' => 100000,
+				)
+			);
+		}
+	);
+}
+
+// Test R1 : port SMTP forcé (ex. port fermé 1099) ; test R4 : envoi lent (secondes).
+add_action(
+	'phpmailer_init',
+	static function ( $mailer ) {
+		$port = (int) get_option( 'oli_acr_test_smtp_port', 0 );
+		if ( $port ) {
+			$mailer->Port = $port; // phpcs:ignore
+		}
+		$sleep = (int) get_option( 'oli_acr_test_mail_sleep', 0 );
+		if ( $sleep ) {
+			sleep( $sleep );
+		}
+	},
+	50
+);
+
+// Test R8 : journal des requêtes SQL qui lisent les options du plugin (une ligne par requête).
+if ( get_option( 'oli_acr_test_query_log', '' ) ) {
+	$GLOBALS['oli_acr_test_query_file'] = (string) get_option( 'oli_acr_test_query_log' );
+	add_filter(
+		'query',
+		static function ( $query ) {
+			if ( false !== strpos( $query, 'oli_acr_' ) && false === strpos( $query, 'oli_acr_test_' ) && 0 === stripos( ltrim( $query ), 'SELECT' ) && false !== strpos( $query, 'options' ) ) {
+				file_put_contents( $GLOBALS['oli_acr_test_query_file'], preg_replace( '/\s+/', ' ', $query ) . "\n", FILE_APPEND ); // phpcs:ignore
+			}
+			return $query;
+		}
+	);
+}
