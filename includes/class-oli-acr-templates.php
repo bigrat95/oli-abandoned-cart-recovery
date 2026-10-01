@@ -494,6 +494,8 @@ class OLI_ACR_Templates {
 		return $all;
 	}
 
+	// Contenu de courriels HTML : style="text-align:center" en ligne est voulu (les logiciels de courriel
+	// n'appliquent pas de feuille de style externe ni de balise style).
 	/**
 	 * Modèles par défaut dans la langue courante : 2 relances de panier et 1 relance de commande en attente.
 	 *

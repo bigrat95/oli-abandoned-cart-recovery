@@ -1,0 +1,2 @@
+/* Oli Abandoned Cart Recovery : page de paiement seulement. Champ piège caché aux humains (hors écran). */
+.oli-acr-hp { position: absolute !important; left: -9999px !important; width: 1px; height: 1px; overflow: hidden; }

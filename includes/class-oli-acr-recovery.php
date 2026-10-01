@@ -44,6 +44,11 @@ class OLI_ACR_Recovery {
 	/**
 	 * Traite les liens de récupération (panier) et de paiement (commande en attente).
 	 *
+	 * Liens envoyés par courriel et ouverts dans un autre navigateur ou une autre session : un nonce
+	 * WordPress (lié à l'utilisateur et à la session) ne peut pas y fonctionner. Ils sont protégés par
+	 * un jeton aléatoire de 32 caractères propre au panier (ou la clé de la commande WooCommerce) et ne
+	 * font que remplir le panier de la session courante ou rediriger vers le paiement.
+	 *
 	 * @return void
 	 */
 	public static function handle_links() {
@@ -177,6 +182,10 @@ class OLI_ACR_Recovery {
 	/**
 	 * Page de désabonnement (confirmation par bouton pour éviter les clics des antipourriels).
 	 *
+	 * Le lien est signé (HMAC lié à l'adresse, vérifié avec hash_equals) ; la confirmation par bouton
+	 * exige en plus un nonce. Le désabonnement en un clic (RFC 8058) est un POST du logiciel de courriel,
+	 * sans nonce possible : il n'est accepté qu'avec une signature valable et ne fait que désabonner.
+	 *
 	 * @return void
 	 */
 	public static function handle_unsubscribe() {
@@ -225,7 +234,27 @@ class OLI_ACR_Recovery {
 			)
 		) . '</p>';
 		$form .= '<form method="post"><input type="hidden" name="_wpnonce" value="' . esc_attr( wp_create_nonce( 'oli_acr_unsub_' . $email ) ) . '"><input type="hidden" name="oli_acr_confirm" value="1"><button type="submit" class="button">' . esc_html__( 'Yes, unsubscribe me', 'oli-abandoned-cart-recovery' ) . '</button></form>';
-		wp_die( $form, esc_html( $title ), array( 'response' => 200 ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Contenu échappé ci-dessus.
+		wp_die(
+			wp_kses(
+				$form,
+				array(
+					'h1'     => array(),
+					'p'      => array(),
+					'form'   => array( 'method' => true ),
+					'input'  => array(
+						'type'  => true,
+						'name'  => true,
+						'value' => true,
+					),
+					'button' => array(
+						'type'  => true,
+						'class' => true,
+					),
+				)
+			),
+			esc_html( $title ),
+			array( 'response' => 200 )
+		);
 	}
 
 	/**

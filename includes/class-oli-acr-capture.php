@@ -55,6 +55,7 @@ class OLI_ACR_Capture {
 		if ( ! oli_acr_user_is_tracked( get_current_user_id() ) ) {
 			return;
 		}
+		wp_enqueue_style( 'oli-acr-checkout', OLI_ACR_URL . 'assets/css/checkout.css', array(), OLI_ACR_VERSION );
 		wp_enqueue_script( 'oli-acr-capture', OLI_ACR_URL . 'assets/js/capture.js', array(), OLI_ACR_VERSION, true );
 		wp_localize_script(
 			'oli-acr-capture',
@@ -116,6 +117,10 @@ class OLI_ACR_Capture {
 
 	/**
 	 * Point d'entrée AJAX (wc-ajax) appelé sur blur/change du champ courriel ou téléphone.
+	 *
+	 * Point public (visiteurs non connectés) : pas de capacité à vérifier, mais un nonce lié à la session
+	 * WooCommerce (check_ajax_referer, réponse -1 / 403 sans nonce valable), un champ piège, des limites
+	 * de débit et des entrées nettoyées. Il n'agit que sur le panier de la session courante.
 	 *
 	 * @return void
 	 */
@@ -200,11 +205,17 @@ class OLI_ACR_Capture {
 	 * @return void
 	 */
 	public static function honeypot_field() {
-		echo '<p class="oli-acr-hp" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden"><label for="oli_acr_hp">' . esc_html__( 'Leave this field empty', 'oli-abandoned-cart-recovery' ) . '</label><input type="text" name="oli_acr_hp" id="oli_acr_hp" value="" tabindex="-1" autocomplete="off"></p>';
+		// Caché par assets/css/checkout.css (chargé avec le script de capture) : rien à afficher sans cette feuille.
+		if ( ! wp_style_is( 'oli-acr-checkout', 'enqueued' ) ) {
+			return;
+		}
+		echo '<p class="oli-acr-hp" aria-hidden="true"><label for="oli_acr_hp">' . esc_html__( 'Leave this field empty', 'oli-abandoned-cart-recovery' ) . '</label><input type="text" name="oli_acr_hp" id="oli_acr_hp" value="" tabindex="-1" autocomplete="off"></p>';
 	}
 
 	/**
 	 * Nonce frais pour la capture (wc-ajax n'est jamais mis en cache ; en-têtes no-cache en plus).
+	 *
+	 * Lecture seule : ne lit aucune entrée et ne modifie aucune donnée, donc pas de nonce à vérifier ici.
 	 *
 	 * @return void
 	 */

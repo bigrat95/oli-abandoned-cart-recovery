@@ -3,7 +3,7 @@
  * Plugin Name: Oli Abandoned Cart Recovery
  * Plugin URI: https://github.com/bigrat95/oli-abandoned-cart-recovery
  * Description: Lightweight abandoned cart and pending order recovery for WooCommerce. Captures the checkout email as soon as it is typed (classic and block checkout), sends a sequence of reminder emails with unique coupons, and tracks recovered sales.
- * Version: 1.1.0
+ * Version: 1.1.1
  * Requires at least: 6.4
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
@@ -12,7 +12,6 @@
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: oli-abandoned-cart-recovery
- * Domain Path: /languages
  * WC requires at least: 8.2
  * WC tested up to: 11.1
  *
@@ -23,13 +22,15 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'OLI_ACR_VERSION', '1.1.0' );
+define( 'OLI_ACR_VERSION', '1.1.1' );
 define( 'OLI_ACR_DB_VERSION', '1.1.0' );
 define( 'OLI_ACR_FILE', __FILE__ );
 define( 'OLI_ACR_DIR', plugin_dir_path( __FILE__ ) );
 define( 'OLI_ACR_URL', plugin_dir_url( __FILE__ ) );
 define( 'OLI_ACR_BASENAME', plugin_basename( __FILE__ ) );
 define( 'OLI_ACR_CAP', 'oli_acr_manage' );
+define( 'OLI_ACR_MIN_WP', '6.4' );
+define( 'OLI_ACR_MIN_PHP', '7.4' );
 
 require_once OLI_ACR_DIR . 'includes/functions.php';
 require_once OLI_ACR_DIR . 'includes/class-oli-acr-lang.php';
@@ -57,17 +58,31 @@ add_action(
 );
 
 /**
+ * Vérifie les versions minimales de PHP et de WordPress (déjà bloquées par WordPress à l'activation,
+ * revérifiées ici au cas où le site serait mis à niveau à l'envers ou le plugin copié à la main).
+ *
+ * @return bool
+ */
+function oli_acr_requirements_met() {
+	global $wp_version;
+	return version_compare( PHP_VERSION, OLI_ACR_MIN_PHP, '>=' ) && version_compare( (string) $wp_version, OLI_ACR_MIN_WP, '>=' );
+}
+
+/**
  * Démarrage du plugin une fois WooCommerce chargé.
  *
  * @return void
  */
 function oli_acr_boot() {
+	if ( ! oli_acr_requirements_met() ) {
+		add_action( 'admin_notices', 'oli_acr_requirements_notice' );
+		return;
+	}
 	if ( ! class_exists( 'WooCommerce' ) ) {
 		add_action( 'admin_notices', 'oli_acr_missing_wc_notice' );
 		return;
 	}
 
-	add_action( 'init', 'oli_acr_load_textdomain' );
 	OLI_ACR_Lang::init();
 	add_action( 'init', array( 'OLI_ACR_Install', 'maybe_upgrade' ), 20 );
 	OLI_ACR_Capture::init();
@@ -84,20 +99,46 @@ function oli_acr_boot() {
 add_action( 'plugins_loaded', 'oli_acr_boot', 20 );
 
 /**
- * Avis quand WooCommerce est absent.
+ * Indique si un avis de dépendance doit s'afficher : écran des extensions seulement (Guideline 11),
+ * pour les utilisateurs qui peuvent activer des extensions.
+ *
+ * @return bool
+ */
+function oli_acr_show_dependency_notice() {
+	if ( ! current_user_can( 'activate_plugins' ) || ! function_exists( 'get_current_screen' ) ) {
+		return false;
+	}
+	$screen = get_current_screen();
+	return $screen && in_array( $screen->id, array( 'plugins', 'plugins-network' ), true );
+}
+
+/**
+ * Avis quand WooCommerce est absent (écran des extensions seulement, fermable).
  *
  * @return void
  */
 function oli_acr_missing_wc_notice() {
-	echo '<div class="notice notice-error"><p>' . esc_html__( 'Oli Abandoned Cart Recovery requires WooCommerce to be installed and active.', 'oli-abandoned-cart-recovery' ) . '</p></div>';
+	if ( ! oli_acr_show_dependency_notice() ) {
+		return;
+	}
+	echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__( 'Oli Abandoned Cart Recovery requires WooCommerce to be installed and active.', 'oli-abandoned-cart-recovery' ) . '</p></div>';
 }
 
 /**
- * Charge les traductions fournies avec le plugin (fr_CA, fr_FR).
+ * Avis quand PHP ou WordPress est trop ancien (écran des extensions seulement, fermable).
  *
  * @return void
  */
-function oli_acr_load_textdomain() {
-	// phpcs:ignore PluginCheck.CodeAnalysis.DiscouragedFunctions.load_plugin_textdomainFound -- Le plugin n'est pas (encore) hébergé sur wordpress.org et fournit ses propres traductions dans /languages.
-	load_plugin_textdomain( 'oli-abandoned-cart-recovery', false, dirname( OLI_ACR_BASENAME ) . '/languages' );
+function oli_acr_requirements_notice() {
+	if ( ! oli_acr_show_dependency_notice() ) {
+		return;
+	}
+	echo '<div class="notice notice-error is-dismissible"><p>' . esc_html(
+		sprintf(
+			/* translators: 1: minimum PHP version, 2: minimum WordPress version. */
+			__( 'Oli Abandoned Cart Recovery requires PHP %1$s and WordPress %2$s or later. The plugin is inactive until the site is updated.', 'oli-abandoned-cart-recovery' ),
+			OLI_ACR_MIN_PHP,
+			OLI_ACR_MIN_WP
+		)
+	) . '</p></div>';
 }

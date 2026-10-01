@@ -4,7 +4,7 @@ Tags: abandoned cart, woocommerce, cart recovery, pending orders, multilingual
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -98,7 +98,7 @@ Free Polylang alone translates the pages, but WooCommerce does not recognize the
 `add_filter( 'woocommerce_get_checkout_page_id', function ( $id ) { return function_exists( 'pll_get_post' ) && pll_get_post( $id ) ? pll_get_post( $id ) : $id; } );`
 `add_filter( 'woocommerce_get_cart_page_id', function ( $id ) { return function_exists( 'pll_get_post' ) && pll_get_post( $id ) ? pll_get_post( $id ) : $id; } );`
 
-Until one of them is in place, the plugin shows an admin notice.
+Until one of them is in place, the plugin shows a dismissible notice on its own screens.
 
 = Which text is used for a language? =
 
@@ -143,7 +143,7 @@ No, not by default. The **Require consent** switch is on by default and applies 
 
 = I upgraded from 1.0.x and my store was in "Always" mode. What changed? =
 
-Version 1.1.0 turns consent on for these stores (the switch is on) and shows an admin notice until you dismiss it. You can turn consent off again in Settings, under your own responsibility.
+Version 1.1.0 turns consent on for these stores (the switch is on) and shows a notice on the plugin's screens until you dismiss it. You can turn consent off again in Settings, under your own responsibility.
 
 = Are carts saved by 1.0.x still reminded after the update? =
 
@@ -151,7 +151,7 @@ No. Version 1.0.x did not record whether a cart was saved with the consent box t
 
 = What happens when an email cannot be sent? =
 
-The cart gets the *Send failed* status with the error message, an admin notice is shown and the error is logged in WooCommerce > Status > Logs (source `oli-abandoned-cart-recovery`), even without `WP_DEBUG`. The reminder is retried after 5 minutes, 30 minutes and 2 hours, then the cart stays *Send failed*; use **Send next reminder now** once your mail settings are fixed.
+The cart gets the *Send failed* status with the error message, a dismissible notice is shown on the plugin's screens and the error is logged in WooCommerce > Status > Logs (source `oli-abandoned-cart-recovery`), even without `WP_DEBUG`. The reminder is retried after 5 minutes, 30 minutes and 2 hours, then the cart stays *Send failed*; use **Send next reminder now** once your mail settings are fixed.
 
 = In which language are reminders sent? =
 
@@ -163,7 +163,7 @@ Deleting the plugin from the Plugins screen removes its tables (carts and email 
 
 = Which languages are supported? =
 
-English, French (Canada) and French (France). A POT file is included.
+The plugin is written in English and fully translatable (text domain `oli-abandoned-cart-recovery`). Translations are managed on translate.wordpress.org and installed automatically by WordPress; French (Canada) and French (France) translations will be contributed there.
 
 == Privacy ==
 
@@ -178,6 +178,14 @@ The plugin stores, in the store's own database: the email, phone, first and last
 5. Cart reminder email received by the customer, with the cart items and the recovery button
 
 == Changelog ==
+
+= 1.1.1 =
+* Admin notices are shown only on the plugin's own screens (WooCommerce > Abandoned Carts), and all of them can be dismissed; the WooCommerce requirement notice is shown only on the Plugins screen
+* Admin script and styles are enqueued only on the plugin's screens; CSS selectors are scoped to the plugin's page; no more inline scripts, inline event handlers or inline style attributes in the admin and on the checkout page
+* Bulk delete of carts is handled before the page is displayed (capability and nonce checks, then a clean redirect)
+* Activation works on every supported WordPress version (autoload helper with a fallback when `wp_set_option_autoload_values()` is not available), and PHP / WordPress versions are checked with a clear message instead of an error
+* Translations are no longer bundled with the plugin: WordPress loads them automatically from translate.wordpress.org
+* Security hardening: the unsubscribe confirmation page output is filtered with `wp_kses()`
 
 = 1.1.0 =
 * New: consent switch (on by default) that applies to guests and logged-in customers; when off, a permanent Law 25 / GDPR warning is shown in the admin
@@ -234,6 +242,9 @@ The plugin stores, in the store's own database: the email, phone, first and last
 * French (Canada) and French (France) translations
 
 == Upgrade Notice ==
+
+= 1.1.1 =
+WordPress.org review fixes: admin notices limited to the plugin's screens and dismissible, enqueued admin script, activation hardened on WordPress 6.4 and later. Translations now come from translate.wordpress.org.
 
 = 1.1.0 =
 Multilingual templates and consent text. Consent is now required for guests and logged-in customers (a store in "Always" mode switches to consent, with a notice); carts saved by 1.0.x are no longer reminded until the customer consents again. Failed reminders are retried.

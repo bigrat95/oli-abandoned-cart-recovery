@@ -321,7 +321,8 @@ class OLI_ACR_Lang {
 		if ( 0 === strpos( $locale, 'en_' ) ) {
 			return true;
 		}
-		$file = 'oli-abandoned-cart-recovery-' . $locale . '.mo';
-		return file_exists( OLI_ACR_DIR . 'languages/' . $file ) || ( defined( 'WP_LANG_DIR' ) && file_exists( WP_LANG_DIR . '/plugins/' . $file ) );
+		// Traductions livrées par translate.wordpress.org (wp-content/languages/plugins), chargées par WordPress.
+		$file = 'oli-abandoned-cart-recovery-' . $locale;
+		return defined( 'WP_LANG_DIR' ) && ( file_exists( WP_LANG_DIR . '/plugins/' . $file . '.mo' ) || file_exists( WP_LANG_DIR . '/plugins/' . $file . '.l10n.php' ) );
 	}
 }

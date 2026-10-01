@@ -629,6 +629,8 @@ class OLI_ACR_Mailer {
 			}
 			$rows[] = array( $image, $name, (int) $item['quantity'], (float) $item['line_total'] );
 		}
+		// Courriel HTML : les attributs style en ligne sont voulus (les logiciels de courriel ignorent les feuilles
+		// de style et les balises style) ; ce HTML n'est jamais affiché dans l'administration ni sur le site.
 		// La colonne des images n'est affichée que si au moins un article a une image (sinon elle reste vide, surtout visible sur mobile).
 		$with_images = (bool) array_filter( wp_list_pluck( $rows, 0 ) );
 		$html        = '<table class="oli-acr-items" cellspacing="0" cellpadding="6" border="1" style="width:100%;border-collapse:collapse;border:1px solid #e5e5e5;margin:0 0 16px">';

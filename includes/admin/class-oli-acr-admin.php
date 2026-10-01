@@ -22,6 +22,23 @@ class OLI_ACR_Admin {
 	const SLUG = 'oli-acr';
 
 	/**
+	 * Suffixe d'écran de la page du plugin (retour de add_submenu_page()).
+	 *
+	 * @var string
+	 */
+	private static $hook = '';
+
+	/**
+	 * Avis fermables par utilisateur (méta utilisateur), en plus des avis fermés pour tout le site.
+	 */
+	const USER_NOTICES = array( 'consent_off', 'polylang_wc' );
+
+	/**
+	 * Méta utilisateur des avis fermés (préfixe _oli_acr_ : supprimée par uninstall.php).
+	 */
+	const DISMISSED_META = '_oli_acr_dismissed_notices';
+
+	/**
 	 * Accroches.
 	 *
 	 * @return void
@@ -68,7 +85,25 @@ class OLI_ACR_Admin {
 	 * @return void
 	 */
 	public static function menu() {
-		add_submenu_page( 'woocommerce', __( 'Abandoned Carts', 'oli-abandoned-cart-recovery' ), __( 'Abandoned Carts', 'oli-abandoned-cart-recovery' ), OLI_ACR_CAP, self::SLUG, array( __CLASS__, 'render' ) );
+		$hook = add_submenu_page( 'woocommerce', __( 'Abandoned Carts', 'oli-abandoned-cart-recovery' ), __( 'Abandoned Carts', 'oli-abandoned-cart-recovery' ), OLI_ACR_CAP, self::SLUG, array( __CLASS__, 'render' ) );
+		if ( is_string( $hook ) && '' !== $hook ) {
+			self::$hook = $hook;
+			// Actions groupées traitées avant tout affichage (redirection propre, sans script dans la page).
+			add_action( 'load-' . $hook, array( __CLASS__, 'maybe_bulk_delete' ) );
+		}
+	}
+
+	/**
+	 * Indique si l'écran courant est une page du plugin.
+	 *
+	 * @return bool
+	 */
+	public static function is_plugin_screen() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen ) {
+			return false;
+		}
+		return ( '' !== self::$hook && self::$hook === $screen->id ) || false !== strpos( (string) $screen->id, '_page_' . self::SLUG );
 	}
 
 	/**
@@ -78,10 +113,19 @@ class OLI_ACR_Admin {
 	 * @return void
 	 */
 	public static function assets( $hook ) {
-		if ( false === strpos( (string) $hook, self::SLUG ) ) {
+		// Styles et script chargés sur les écrans du plugin seulement ; sélecteurs CSS limités à .oli-acr-wrap.
+		if ( ( '' !== self::$hook && self::$hook !== $hook ) || false === strpos( (string) $hook, self::SLUG ) ) {
 			return;
 		}
 		wp_enqueue_style( 'oli-acr-admin', OLI_ACR_URL . 'assets/css/admin.css', array(), OLI_ACR_VERSION );
+		wp_enqueue_script( 'oli-acr-admin', OLI_ACR_URL . 'assets/js/admin.js', array(), OLI_ACR_VERSION, true );
+		wp_localize_script(
+			'oli-acr-admin',
+			'oliAcrAdmin',
+			array(
+				'confirmDeleteTemplate' => __( 'Delete this template?', 'oli-abandoned-cart-recovery' ),
+			)
+		);
 	}
 
 	/**
@@ -139,11 +183,6 @@ class OLI_ACR_Admin {
 		}
 		$msg = isset( $_GET['oli_acr_msg'] ) ? sanitize_key( $_GET['oli_acr_msg'] ) : '';
 		// phpcs:enable
-
-		// Actions groupées des paniers.
-		if ( 'carts' === $tab ) {
-			self::maybe_bulk_delete();
-		}
 
 		echo '<div class="wrap oli-acr-wrap">';
 		echo '<h1 class="oli-acr-title"><img src="' . esc_url( OLI_ACR_URL . 'assets/images/icon.svg' ) . '" alt="" width="36" height="36"> ' . esc_html__( 'Oli Abandoned Cart Recovery', 'oli-abandoned-cart-recovery' ) . '</h1>';
@@ -206,29 +245,34 @@ class OLI_ACR_Admin {
 	}
 
 	/**
-	 * Suppression groupée.
+	 * Suppression groupée des paniers (accroche load-{écran}, avant tout affichage).
+	 *
+	 * Capacité + nonce de WP_List_Table (bulk-oli_acr_carts), puis redirection vers une URL propre
+	 * (l'URL de l'action n'est pas gardée dans l'historique : plus besoin de script).
 	 *
 	 * @return void
 	 */
-	private static function maybe_bulk_delete() {
+	public static function maybe_bulk_delete() {
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- Lecture du nom de l'action seulement ; nonce vérifié avant toute modification.
+		$tab    = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : '';
 		$action = '';
-		// phpcs:disable WordPress.Security.NonceVerification.Recommended
-		if ( isset( $_GET['action'] ) && 'delete' === $_GET['action'] ) {
+		if ( isset( $_GET['action'] ) && 'delete' === sanitize_key( $_GET['action'] ) ) {
 			$action = 'delete';
-		} elseif ( isset( $_GET['action2'] ) && 'delete' === $_GET['action2'] ) {
+		} elseif ( isset( $_GET['action2'] ) && 'delete' === sanitize_key( $_GET['action2'] ) ) {
 			$action = 'delete';
 		}
+		$has_ids = ! empty( $_GET['cart_ids'] );
 		// phpcs:enable
-		if ( 'delete' !== $action || empty( $_GET['cart_ids'] ) ) {
+		if ( 'carts' !== $tab || 'delete' !== $action || ! $has_ids ) {
 			return;
 		}
+		self::check_cap();
 		check_admin_referer( 'bulk-oli_acr_carts' );
-		$ids = array_map( 'absint', (array) wp_unslash( $_GET['cart_ids'] ) );
+		$ids = isset( $_GET['cart_ids'] ) ? array_filter( array_map( 'absint', (array) wp_unslash( $_GET['cart_ids'] ) ) ) : array();
 		foreach ( $ids as $id ) {
 			OLI_ACR_Carts::delete( $id );
 		}
-		echo '<script>window.history.replaceState(null, "", ' . wp_json_encode( self::url( 'carts' ) ) . ');</script>';
-		self::notice( 'deleted' );
+		self::redirect( 'carts', 'deleted' );
 	}
 
 	/**
@@ -591,6 +635,10 @@ class OLI_ACR_Admin {
 			// B3 : interrupteur éteint par le marchand, l'avis « le consentement est maintenant exigé » n'a plus lieu d'être.
 			delete_option( 'oli_acr_notice_consent_migrated' );
 		}
+		if ( 'always' === $new['guest_tracking'] && 'always' !== $old['guest_tracking'] ) {
+			// Consentement éteint à nouveau : l'avertissement réapparaît une fois pour chaque utilisateur.
+			self::reset_user_dismissal( 'consent_off' );
+		}
 		$new['fallback_language'] = isset( $raw['fallback_language'] ) && in_array( $raw['fallback_language'], OLI_ACR_Lang::adapter()->languages(), true ) ? (string) $raw['fallback_language'] : '';
 		$new['consent_texts']     = array();
 		$submitted_consent        = isset( $raw['consent_texts'] ) && is_array( $raw['consent_texts'] ) ? $raw['consent_texts'] : array();
@@ -666,7 +714,7 @@ class OLI_ACR_Admin {
 			$tpl    = OLI_ACR_Templates::for_locale( (string) $id, $tpl, $lang );
 			$delete = wp_nonce_url( admin_url( 'admin-post.php?action=oli_acr_delete_template&template=' . $id ), 'oli_acr_delete_template' );
 			printf(
-				'<tr><td><strong><a href="%s">%s</a></strong><br><small>%s</small></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><a href="%s">%s</a> | <a class="submitdelete" href="%s" onclick="return confirm(\'%s\');">%s</a></td></tr>',
+				'<tr><td><strong><a href="%s">%s</a></strong><br><small>%s</small></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><a href="%s">%s</a> | <a class="submitdelete oli-acr-confirm" href="%s" data-confirm="%s">%s</a></td></tr>',
 				esc_url(
 					self::url(
 						'templates',
@@ -693,7 +741,7 @@ class OLI_ACR_Admin {
 				),
 				esc_html__( 'Edit', 'oli-abandoned-cart-recovery' ),
 				esc_url( $delete ),
-				esc_js( __( 'Delete this template?', 'oli-abandoned-cart-recovery' ) ),
+				esc_attr__( 'Delete this template?', 'oli-abandoned-cart-recovery' ),
 				esc_html__( 'Delete', 'oli-abandoned-cart-recovery' )
 			);
 		}
@@ -970,7 +1018,7 @@ class OLI_ACR_Admin {
 		if ( empty( $missing ) ) {
 			return '';
 		}
-		return '<p class="oli-acr-coupon-missing" style="color:#b32d2e"><strong>' . esc_html__( 'No coupon will be created:', 'oli-abandoned-cart-recovery' ) . '</strong> ' . esc_html(
+		return '<p class="oli-acr-coupon-missing"><strong>' . esc_html__( 'No coupon will be created:', 'oli-abandoned-cart-recovery' ) . '</strong> ' . esc_html(
 			sprintf(
 				/* translators: %s: list of languages. */
 				__( 'the email does not contain {coupon} or {coupon_code} (%s). Add one of these tags to the content to send the coupon.', 'oli-abandoned-cart-recovery' ),
@@ -980,52 +1028,84 @@ class OLI_ACR_Admin {
 	}
 
 	/**
-	 * Avis généraux de l'administration (toutes les pages, utilisateurs autorisés seulement).
+	 * Lien « Ne plus afficher » d'un avis (nonce par avis).
 	 *
-	 * - Consentement désactivé : avertissement permanent (Loi 25 et RGPD).
+	 * @param string $notice Clé de l'avis.
+	 * @return string URL.
+	 */
+	private static function dismiss_url( $notice ) {
+		return wp_nonce_url( admin_url( 'admin-post.php?action=oli_acr_dismiss_notice&notice=' . $notice ), 'oli_acr_dismiss_' . $notice );
+	}
+
+	/**
+	 * Indique si l'utilisateur courant a fermé un avis (avis fermables par utilisateur).
+	 *
+	 * @param string $notice Clé de l'avis.
+	 * @return bool
+	 */
+	private static function user_dismissed( $notice ) {
+		$dismissed = get_user_meta( get_current_user_id(), self::DISMISSED_META, true );
+		return is_array( $dismissed ) && ! empty( $dismissed[ $notice ] );
+	}
+
+	/**
+	 * Avis du plugin (Guideline 11 : pas de détournement du tableau de bord).
+	 *
+	 * Affichés seulement sur les écrans du plugin (WooCommerce > Abandoned Carts), aux utilisateurs autorisés,
+	 * tous fermables : la croix les masque pour la page, « Dismiss » les ferme pour de bon (nonce + capacité).
+	 * Aucun avis sur le tableau de bord ni sur les autres pages de l'administration, aucune invitation à
+	 * acheter ou à noter le plugin.
+	 *
+	 * - Consentement désactivé : avertissement (Loi 25 et RGPD), fermable par utilisateur ; le même
+	 *   avertissement reste dans l'onglet Réglages, à côté de l'interrupteur.
+	 * - Polylang sans Polylang for WooCommerce : fermable par utilisateur.
 	 * - Migration R2 : le mode « toujours » est passé au consentement (jusqu'à fermeture).
-	 * - Échecs d'envoi des relances (jusqu'à fermeture).
+	 * - Échecs d'envoi des relances (jusqu'à fermeture ; revient au prochain échec).
 	 *
 	 * @return void
 	 */
 	public static function global_notices() {
-		if ( ! current_user_can( OLI_ACR_CAP ) ) {
+		if ( ! current_user_can( OLI_ACR_CAP ) || ! self::is_plugin_screen() ) {
 			return;
 		}
-		if ( 'always' === oli_acr_get_setting( 'guest_tracking' ) ) {
+		if ( 'always' === oli_acr_get_setting( 'guest_tracking' ) && ! self::user_dismissed( 'consent_off' ) ) {
 			printf(
-				'<div class="notice notice-error oli-acr-consent-off"><p><strong>%1$s</strong> %2$s <a href="%3$s">%4$s</a></p></div>',
+				'<div class="notice notice-error is-dismissible oli-acr-consent-off"><p><strong>%1$s</strong> %2$s <a href="%3$s">%4$s</a> | <a href="%5$s">%6$s</a></p></div>',
 				esc_html__( 'Oli Abandoned Cart Recovery: consent is turned off.', 'oli-abandoned-cart-recovery' ),
 				esc_html__( 'Emails and carts of guests and logged-in customers are saved without asking for consent. Quebec Law 25 and the GDPR generally require explicit consent before saving this data for marketing reminders. You are responsible for having another legal basis.', 'oli-abandoned-cart-recovery' ),
 				esc_url( self::url( 'settings' ) ),
-				esc_html__( 'Turn consent back on', 'oli-abandoned-cart-recovery' )
+				esc_html__( 'Turn consent back on', 'oli-abandoned-cart-recovery' ),
+				esc_url( self::dismiss_url( 'consent_off' ) ),
+				esc_html__( 'Dismiss', 'oli-abandoned-cart-recovery' )
 			);
 		}
-		if ( self::polylang_needs_wc_bridge() ) {
+		if ( self::polylang_needs_wc_bridge() && ! self::user_dismissed( 'polylang_wc' ) ) {
 			printf(
-				'<div class="notice notice-error oli-acr-polylang-wc"><p><strong>%1$s</strong> %2$s <a href="%3$s" target="_blank" rel="noopener noreferrer">%4$s</a></p></div>',
+				'<div class="notice notice-warning is-dismissible oli-acr-polylang-wc"><p><strong>%1$s</strong> %2$s <a href="%3$s" target="_blank" rel="noopener noreferrer">%4$s</a> | <a href="%5$s">%6$s</a></p></div>',
 				esc_html__( 'Oli Abandoned Cart Recovery: carts on translated checkout pages are not captured.', 'oli-abandoned-cart-recovery' ),
 				esc_html__( 'Polylang is active without "Polylang for WooCommerce", so WooCommerce does not recognize the translated checkout pages: the capture script is not loaded there and no cart is saved in those languages. Install "Polylang for WooCommerce", or link the translated cart and checkout pages to WooCommerce with the woocommerce_get_checkout_page_id filter (see the plugin FAQ).', 'oli-abandoned-cart-recovery' ),
 				esc_url( 'https://polylang.pro/downloads/polylang-for-woocommerce/' ),
-				esc_html__( 'Polylang for WooCommerce', 'oli-abandoned-cart-recovery' )
+				esc_html__( 'Polylang for WooCommerce', 'oli-abandoned-cart-recovery' ),
+				esc_url( self::dismiss_url( 'polylang_wc' ) ),
+				esc_html__( 'Dismiss', 'oli-abandoned-cart-recovery' )
 			);
 		}
 		// B3 : jamais à côté de l'avertissement « consentement désactivé » (les deux messages se contrediraient).
 		if ( get_option( 'oli_acr_notice_consent_migrated' ) && oli_acr_consent_required() ) {
 			printf(
-				'<div class="notice notice-warning oli-acr-consent-migrated"><p><strong>%1$s</strong> %2$s <a href="%3$s">%4$s</a> | <a href="%5$s">%6$s</a></p></div>',
+				'<div class="notice notice-warning is-dismissible oli-acr-consent-migrated"><p><strong>%1$s</strong> %2$s <a href="%3$s">%4$s</a> | <a href="%5$s">%6$s</a></p></div>',
 				esc_html__( 'Oli Abandoned Cart Recovery 1.1.0: consent is now required.', 'oli-abandoned-cart-recovery' ),
 				esc_html__( 'Your store saved guest carts without consent ("Always" mode). To comply with Quebec Law 25 and the GDPR, the update turned consent on: guests and logged-in customers are now tracked only when they check the consent box at checkout. You can turn it off again in the settings, under your own responsibility.', 'oli-abandoned-cart-recovery' ),
 				esc_url( self::url( 'settings' ) ),
 				esc_html__( 'Review the settings', 'oli-abandoned-cart-recovery' ),
-				esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=oli_acr_dismiss_notice&notice=consent_migrated' ), 'oli_acr_dismiss_consent_migrated' ) ),
+				esc_url( self::dismiss_url( 'consent_migrated' ) ),
 				esc_html__( 'Dismiss', 'oli-abandoned-cart-recovery' )
 			);
 		}
 		$failure = get_option( 'oli_acr_mail_failure' );
 		if ( is_array( $failure ) && ! empty( $failure['count'] ) ) {
 			printf(
-				'<div class="notice notice-error oli-acr-mail-failure"><p><strong>%1$s</strong> %2$s <code>%3$s</code> %4$s <a href="%5$s">%6$s</a> | <a href="%7$s">%8$s</a> | <a href="%9$s">%10$s</a></p></div>',
+				'<div class="notice notice-error is-dismissible oli-acr-mail-failure"><p><strong>%1$s</strong> %2$s <code>%3$s</code> %4$s <a href="%5$s">%6$s</a> | <a href="%7$s">%8$s</a> | <a href="%9$s">%10$s</a></p></div>',
 				esc_html__( 'Oli Abandoned Cart Recovery: some reminders could not be sent.', 'oli-abandoned-cart-recovery' ),
 				/* translators: 1: number of failures, 2: date and time of the last failure (site format). */
 				esc_html( sprintf( _n( '%1$d failure, the last one: %2$s.', '%1$d failures, the last one: %2$s.', (int) $failure['count'], 'oli-abandoned-cart-recovery' ), (int) $failure['count'], oli_acr_format_datetime( (int) $failure['time'] ) ) ) . ' ' . esc_html__( 'Error:', 'oli-abandoned-cart-recovery' ),
@@ -1035,27 +1115,56 @@ class OLI_ACR_Admin {
 				esc_html__( 'Failed carts', 'oli-abandoned-cart-recovery' ),
 				esc_url( admin_url( 'admin.php?page=wc-status&tab=logs&source=oli-abandoned-cart-recovery' ) ),
 				esc_html__( 'Logs', 'oli-abandoned-cart-recovery' ),
-				esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=oli_acr_dismiss_notice&notice=mail_failure' ), 'oli_acr_dismiss_mail_failure' ) ),
+				esc_url( self::dismiss_url( 'mail_failure' ) ),
 				esc_html__( 'Dismiss', 'oli-abandoned-cart-recovery' )
 			);
 		}
 	}
 
 	/**
-	 * Ferme un avis (nonce par avis).
+	 * Ferme un avis : capacité + nonce par avis.
 	 *
 	 * @return void
 	 */
 	public static function dismiss_notice() {
 		self::check_cap();
-		$notice = isset( $_GET['notice'] ) ? sanitize_key( $_GET['notice'] ) : '';
-		if ( ! in_array( $notice, array( 'consent_migrated', 'mail_failure' ), true ) ) {
+		$notice = isset( $_GET['notice'] ) ? sanitize_key( $_GET['notice'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Nonce vérifié juste après, avec la clé de l'avis.
+		if ( ! in_array( $notice, array_merge( array( 'consent_migrated', 'mail_failure' ), self::USER_NOTICES ), true ) ) {
 			wp_die( esc_html__( 'Unknown notice.', 'oli-abandoned-cart-recovery' ), '', array( 'response' => 400 ) );
 		}
 		check_admin_referer( 'oli_acr_dismiss_' . $notice );
-		delete_option( 'consent_migrated' === $notice ? 'oli_acr_notice_consent_migrated' : 'oli_acr_mail_failure' );
+		if ( in_array( $notice, self::USER_NOTICES, true ) ) {
+			$dismissed            = get_user_meta( get_current_user_id(), self::DISMISSED_META, true );
+			$dismissed            = is_array( $dismissed ) ? $dismissed : array();
+			$dismissed[ $notice ] = time();
+			update_user_meta( get_current_user_id(), self::DISMISSED_META, $dismissed );
+		} else {
+			delete_option( 'consent_migrated' === $notice ? 'oli_acr_notice_consent_migrated' : 'oli_acr_mail_failure' );
+		}
 		wp_safe_redirect( wp_get_referer() ? wp_get_referer() : self::url( 'dashboard' ) );
 		exit;
+	}
+
+	/**
+	 * Réaffiche un avis fermé par les utilisateurs.
+	 *
+	 * @param string $notice Clé de l'avis.
+	 * @return void
+	 */
+	private static function reset_user_dismissal( $notice ) {
+		$users = get_users(
+			array(
+				'meta_key' => self::DISMISSED_META, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Réglage enregistré rarement, quelques administrateurs.
+				'fields'   => 'ID',
+			)
+		);
+		foreach ( $users as $user_id ) {
+			$dismissed = get_user_meta( (int) $user_id, self::DISMISSED_META, true );
+			if ( is_array( $dismissed ) && isset( $dismissed[ $notice ] ) ) {
+				unset( $dismissed[ $notice ] );
+				update_user_meta( (int) $user_id, self::DISMISSED_META, $dismissed );
+			}
+		}
 	}
 
 	/**

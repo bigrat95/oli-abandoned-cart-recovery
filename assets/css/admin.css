@@ -1,22 +1,23 @@
-/* Oli Abandoned Cart Recovery : styles d'admin */
-.oli-acr-title { display: flex; align-items: center; gap: 10px; }
-.oli-acr-title img { border-radius: 6px; }
-.oli-acr-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin: 16px 0 24px; }
-.oli-acr-card { background: #fff; border: 1px solid #dcdcde; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; }
-.oli-acr-card-value { font-size: 26px; font-weight: 600; color: #1d2327; line-height: 1.2; }
-.oli-acr-card-label { color: #646970; margin-top: 4px; }
-.oli-acr-status { display: inline-block; padding: 2px 8px; border-radius: 3px; background: #f0f0f1; color: #50575e; }
-.oli-acr-status-open { background: #e5f0fa; color: #135e96; }
-.oli-acr-status-abandoned { background: #fcf0e3; color: #8a4b0f; }
-.oli-acr-status-reminded { background: #f8e8f8; color: #6b2d6b; }
-.oli-acr-status-recovered { background: #e6f4ea; color: #1e6b34; }
-.oli-acr-status-unsubscribed { background: #fbeaea; color: #8a1f1f; }
-.oli-acr-placeholders { columns: 2; margin-top: 4px; }
-.oli-acr-role { display: inline-block; margin: 4px 12px 0 0; }
-.oli-acr-periods { float: none; margin: 12px 0 0; }
-.oli-acr-test { margin-bottom: 24px; }
+/* Oli Abandoned Cart Recovery : styles d'admin, chargés sur les écrans du plugin seulement et limités à .oli-acr-wrap. */
+.oli-acr-wrap .oli-acr-title { display: flex; align-items: center; gap: 10px; }
+.oli-acr-wrap .oli-acr-title img { border-radius: 6px; }
+.oli-acr-wrap .oli-acr-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin: 16px 0 24px; }
+.oli-acr-wrap .oli-acr-card { background: #fff; border: 1px solid #dcdcde; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; }
+.oli-acr-wrap .oli-acr-card-value { font-size: 26px; font-weight: 600; color: #1d2327; line-height: 1.2; }
+.oli-acr-wrap .oli-acr-card-label { color: #646970; margin-top: 4px; }
+.oli-acr-wrap .oli-acr-status { display: inline-block; padding: 2px 8px; border-radius: 3px; background: #f0f0f1; color: #50575e; }
+.oli-acr-wrap .oli-acr-status-open { background: #e5f0fa; color: #135e96; }
+.oli-acr-wrap .oli-acr-status-abandoned { background: #fcf0e3; color: #8a4b0f; }
+.oli-acr-wrap .oli-acr-status-reminded { background: #f8e8f8; color: #6b2d6b; }
+.oli-acr-wrap .oli-acr-status-recovered { background: #e6f4ea; color: #1e6b34; }
+.oli-acr-wrap .oli-acr-status-unsubscribed { background: #fbeaea; color: #8a1f1f; }
+.oli-acr-wrap .oli-acr-placeholders { columns: 2; margin-top: 4px; }
+.oli-acr-wrap .oli-acr-role { display: inline-block; margin: 4px 12px 0 0; }
+.oli-acr-wrap .oli-acr-periods { float: none; margin: 12px 0 0; }
+.oli-acr-wrap .oli-acr-test { margin-bottom: 24px; }
+.oli-acr-wrap .oli-acr-coupon-missing { color: #b32d2e; }
 /* Colonne Client : l'adresse courriel ne se coupe jamais au milieu (B7). */
-.wp-list-table .column-email { width: 24%; min-width: 220px; }
-.wp-list-table td.column-email strong.oli-acr-email,
-.wp-list-table td.column-email .oli-acr-email { white-space: nowrap; word-break: keep-all; overflow-wrap: normal; }
-@media screen and (max-width: 782px) { .wp-list-table td.column-email .oli-acr-email { white-space: normal; overflow-wrap: anywhere; } }
+.oli-acr-wrap .wp-list-table .column-email { width: 24%; min-width: 220px; }
+.oli-acr-wrap .wp-list-table td.column-email strong.oli-acr-email,
+.oli-acr-wrap .wp-list-table td.column-email .oli-acr-email { white-space: nowrap; word-break: keep-all; overflow-wrap: normal; }
+@media screen and (max-width: 782px) { .oli-acr-wrap .wp-list-table td.column-email .oli-acr-email { white-space: normal; overflow-wrap: anywhere; } }

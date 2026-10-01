@@ -80,8 +80,8 @@ composer install          # outils de développement seulement (vendor/ est igno
 composer lint             # PHPCS : WordPress-Extra, WordPress-Docs, PHPCompatibilityWP 7.4+ (phpcs.xml.dist)
 composer analyse          # PHPStan niveau 6 + phpstan-wordpress + stubs WooCommerce (phpstan.neon.dist)
 wp plugin check oli-abandoned-cart-recovery   # Plugin Check officiel, sur un WordPress de test
-wp i18n make-pot . languages/oli-abandoned-cart-recovery.pot --exclude=vendor,tests,tools
-bash tools/build-zip.sh   # zip de distribution (sans vendor, tests, tools, phpcs.xml.dist ni phpstan.neon.dist)
+wp i18n make-pot . languages/oli-abandoned-cart-recovery.pot --exclude=vendor,tests,tools,languages   # languages/ reste dans le dépôt (POT, PO de référence pour translate.wordpress.org) mais n'est pas livré
+bash tools/build-zip.sh   # zip de distribution (sans vendor, tests, tools, languages, phpcs.xml.dist ni phpstan.neon.dist) ; le zip wordpress.org est fait avec git archive (export-ignore)
 # Tests de bout en bout, sur un WordPress LOCAL de test et une instance Mailpit DÉDIÉE (le setup vide la boîte) :
 OLI_ACR_E2E_URL=http://localhost:8898 OLI_ACR_E2E_MAILPIT=http://127.0.0.1:8026 OLI_ACR_E2E_WP=/chemin/wp python3 tests/run-e2e.py
 ```

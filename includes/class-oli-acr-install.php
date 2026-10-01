@@ -20,8 +20,26 @@ class OLI_ACR_Install {
 	 * @return void
 	 */
 	public static function activate() {
-		// Les textes par défaut des modèles sont créés dans chaque langue : il faut les traductions du plugin.
-		oli_acr_load_textdomain();
+		// Versions minimales (WordPress les vérifie déjà avec les en-têtes Requires at least / Requires PHP) :
+		// message clair au lieu d'une erreur fatale si l'activation passe quand même.
+		if ( ! oli_acr_requirements_met() ) {
+			deactivate_plugins( OLI_ACR_BASENAME );
+			wp_die(
+				esc_html(
+					sprintf(
+						/* translators: 1: minimum PHP version, 2: minimum WordPress version. */
+						__( 'Oli Abandoned Cart Recovery requires PHP %1$s and WordPress %2$s or later. The plugin is inactive until the site is updated.', 'oli-abandoned-cart-recovery' ),
+						OLI_ACR_MIN_PHP,
+						OLI_ACR_MIN_WP
+					)
+				),
+				esc_html__( 'Plugin could not be activated', 'oli-abandoned-cart-recovery' ),
+				array( 'back_link' => true )
+			);
+		}
+		// Sans WooCommerce (WordPress 6.4 n'applique pas l'en-tête Requires Plugins), l'activation reste
+		// sans erreur : rien ici n'utilise WooCommerce, le plugin attend WooCommerce et affiche un avis
+		// sur l'écran des extensions. Aucune requête HTTP externe et aucune sortie à l'activation.
 		self::create_tables();
 		self::add_caps();
 		if ( false === get_option( 'oli_acr_settings' ) ) {
@@ -107,13 +125,13 @@ class OLI_ACR_Install {
 		OLI_ACR_Templates::sync_languages();
 		update_option( 'oli_acr_version', OLI_ACR_VERSION, true );
 		// R8 : options lues à chaque page, chargées d'avance (les installations 1.0.x les avaient en autoload=off).
-		wp_set_option_autoload_values(
+		self::set_autoload(
 			array(
-				'oli_acr_settings'            => true,
-				'oli_acr_db_version'          => true,
-				'oli_acr_version'             => true,
-				'oli_acr_languages_signature' => true,
-				'oli_acr_schedule_signature'  => true,
+				'oli_acr_settings',
+				'oli_acr_db_version',
+				'oli_acr_version',
+				'oli_acr_languages_signature',
+				'oli_acr_schedule_signature',
 			)
 		);
 		// Réglages de l'avis « vente récupérée » (WC_Email) : WooCommerce les lit sur les pages qui chargent les courriels.
@@ -122,6 +140,40 @@ class OLI_ACR_Install {
 		}
 		// Ancien verrou (transient) remplacé par le verrou atomique « oli_acr_process_lock ».
 		delete_transient( 'oli_acr_lock' );
+	}
+
+	/**
+	 * Met des options en autoload, quelle que soit la version de WordPress.
+	 *
+	 * La fonction wp_set_option_autoload_values() n'existe pas dans toutes les versions : on l'utilise seulement si
+	 * elle est disponible, sinon wp_set_option_autoload(), sinon une mise à jour directe de la colonne autoload.
+	 *
+	 * @param string[] $names Noms des options.
+	 * @return void
+	 */
+	public static function set_autoload( $names ) {
+		$names = array_values( array_filter( array_map( 'strval', (array) $names ) ) );
+		if ( array() === $names ) {
+			return;
+		}
+		if ( function_exists( 'wp_set_option_autoload_values' ) ) {
+			wp_set_option_autoload_values( array_fill_keys( $names, true ) );
+			return;
+		}
+		if ( function_exists( 'wp_set_option_autoload' ) ) {
+			foreach ( $names as $name ) {
+				wp_set_option_autoload( $name, true );
+			}
+			return;
+		}
+		global $wpdb;
+		foreach ( $names as $name ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Repli pour les anciennes versions ; caches vidés ci-dessous.
+			$wpdb->update( $wpdb->options, array( 'autoload' => 'yes' ), array( 'option_name' => $name ) );
+			wp_cache_delete( $name, 'options' );
+		}
+		wp_cache_delete( 'alloptions', 'options' );
+		wp_cache_delete( 'notoptions', 'options' );
 	}
 
 	/**
