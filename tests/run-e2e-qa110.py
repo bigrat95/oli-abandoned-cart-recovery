@@ -89,7 +89,7 @@ def t_b1():
     out = php('''$s = get_option("oli_acr_settings"); $s["pending_enabled"] = "yes"; $s["pending_after"] = array("value"=>1,"unit"=>"hours"); update_option("oli_acr_settings", $s);
       $o = wc_create_order(); $o->add_product(wc_get_product(10), 1); $o->set_billing_email("b1-order-''' + STAMP + '''@example.test"); $o->set_created_via("checkout");
       $o->set_date_created(time() - 2*DAY_IN_SECONDS); $o->calculate_totals(); $o->set_status("pending"); $o->save();
-      $n = OLI_ACR_Scheduler::send_due_orders(); echo $n, "|", oli_acr_consent_required() ? "ON" : "OFF";''')
+      $n = OLI_ACR_Scheduler::send_due_orders(); echo $n, "|", oli_acr_consent_required() ? "ON" : "OFF"; $o->delete(true);''')
     result('(B1) Exception : commande en attente relancée sans case de consentement, interrupteur ON (comportement inchangé)',
            out.endswith('|ON') and len(mails_to(f'b1-order-{STAMP}@example.test')) == 1, out)
     reset()
