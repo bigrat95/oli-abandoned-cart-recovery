@@ -230,6 +230,12 @@ class OLI_ACR_Lang {
 	 */
 	public static function url( $url, $locale ) {
 		$translated = self::adapter()->translate_url( $url, $locale );
+		// Certaines extensions (ex. TranslatePress) recalculent l'URL avec is_ssl() : en WP-CLI ou en cron serveur,
+		// le lien sortait en http://. On garde le schéma de l'URL d'origine quand l'hôte est le même.
+		$scheme = wp_parse_url( $url, PHP_URL_SCHEME );
+		if ( $scheme && wp_parse_url( $translated, PHP_URL_HOST ) === wp_parse_url( $url, PHP_URL_HOST ) ) {
+			$translated = set_url_scheme( $translated, $scheme );
+		}
 		/**
 		 * Filtre une URL convertie vers une langue (liens des courriels, redirections).
 		 *

@@ -4,7 +4,7 @@ Tags: abandoned cart, woocommerce, cart recovery, pending orders, multilingual
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.1.1
+Stable tag: 1.1.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -179,6 +179,9 @@ The plugin stores, in the store's own database: the email, phone, first and last
 
 == Changelog ==
 
+= 1.1.2 =
+* Fix: recovery and unsubscribe links keep https when a multilingual plugin (e.g. TranslatePress) rebuilds the URL during WP-CLI or server cron runs; before, links in the second language could be sent as http:// and one-click unsubscribe (POST) could be lost in the redirect
+
 = 1.1.1 =
 * Admin notices are shown only on the plugin's own screens (WooCommerce > Abandoned Carts), and all of them can be dismissed; the WooCommerce requirement notice is shown only on the Plugins screen
 * Admin script and styles are enqueued only on the plugin's screens; CSS selectors are scoped to the plugin's page; no more inline scripts, inline event handlers or inline style attributes in the admin and on the checkout page
@@ -242,6 +245,9 @@ The plugin stores, in the store's own database: the email, phone, first and last
 * French (Canada) and French (France) translations
 
 == Upgrade Notice ==
+
+= 1.1.2 =
+Links in reminder emails now always keep https, also when reminders are sent by a server cron with a multilingual plugin.
 
 = 1.1.1 =
 WordPress.org review fixes: admin notices limited to the plugin's screens and dismissible, enqueued admin script, activation hardened on WordPress 6.4 and later. Translations now come from translate.wordpress.org.
