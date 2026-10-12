@@ -1,10 +1,11 @@
 === Oli Abandoned Cart Recovery ===
 Contributors: bigrat95
+Donate link: https://www.paypal.com/donate/?hosted_button_id=29SAPKFAHMTNW
 Tags: abandoned cart, woocommerce, cart recovery, pending orders, multilingual
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.1.2
+Stable tag: 1.1.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -179,6 +180,9 @@ The plugin stores, in the store's own database: the email, phone, first and last
 
 == Changelog ==
 
+= 1.1.3 =
+* NEW: Settings and Donate links on the Plugins screen, optional support notice on plugin screens, footer donation link, and Donate link on the WordPress.org plugin page (PayPal)
+
 = 1.1.2 =
 * Fix: recovery and unsubscribe links keep https when a multilingual plugin (e.g. TranslatePress) rebuilds the URL during WP-CLI or server cron runs; before, links in the second language could be sent as http:// and one-click unsubscribe (POST) could be lost in the redirect
 
@@ -245,6 +249,9 @@ The plugin stores, in the store's own database: the email, phone, first and last
 * French (Canada) and French (France) translations
 
 == Upgrade Notice ==
+
+= 1.1.3 =
+Adds Donate / support links (Plugins screen, plugin notice, WordPress.org Donate link).
 
 = 1.1.2 =
 Links in reminder emails now always keep https, also when reminders are sent by a server cron with a multilingual plugin.

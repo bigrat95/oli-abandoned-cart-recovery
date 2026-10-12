@@ -54,18 +54,103 @@ class OLI_ACR_Admin {
 		add_action( 'admin_post_oli_acr_order_action', array( __CLASS__, 'order_action' ) );
 		add_action( 'admin_post_oli_acr_dismiss_notice', array( __CLASS__, 'dismiss_notice' ) );
 		add_action( 'admin_notices', array( __CLASS__, 'global_notices' ) );
+		add_action( 'admin_notices', array( __CLASS__, 'donate_notice' ) );
+		add_action( 'wp_ajax_oli_acr_dismiss_donate', array( __CLASS__, 'ajax_dismiss_donate' ) );
 		add_filter( 'plugin_action_links_' . OLI_ACR_BASENAME, array( __CLASS__, 'action_links' ) );
+		add_filter( 'plugin_row_meta', array( __CLASS__, 'plugin_row_meta' ), 10, 2 );
 	}
 
 	/**
-	 * Lien « Réglages » dans la liste des extensions.
+	 * Liens « Réglages » et « Donate » dans la liste des extensions.
 	 *
 	 * @param array<mixed> $links Liens.
 	 * @return array<mixed>
 	 */
 	public static function action_links( $links ) {
-		array_unshift( $links, '<a href="' . esc_url( self::url( 'settings' ) ) . '">' . esc_html__( 'Settings', 'oli-abandoned-cart-recovery' ) . '</a>' );
+		$settings = '<a href="' . esc_url( self::url( 'settings' ) ) . '">' . esc_html__( 'Settings', 'oli-abandoned-cart-recovery' ) . '</a>';
+		$donate   = '<a href="' . esc_url( OLI_ACR_DONATE_URL ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Donate', 'oli-abandoned-cart-recovery' ) . '</a>';
+		array_unshift( $links, $settings, $donate );
 		return $links;
+	}
+
+	/**
+	 * Lien Donate dans la méta de la ligne d'extension.
+	 *
+	 * @param array<mixed> $links Liens.
+	 * @param string       $file  Basename.
+	 * @return array<mixed>
+	 */
+	public static function plugin_row_meta( $links, $file ) {
+		if ( OLI_ACR_BASENAME !== $file ) {
+			return $links;
+		}
+		$links[] = '<a href="' . esc_url( OLI_ACR_DONATE_URL ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Donate', 'oli-abandoned-cart-recovery' ) . '</a>';
+		return $links;
+	}
+
+	/**
+	 * Avis de soutien (fermable) sur les écrans du plugin uniquement.
+	 *
+	 * @return void
+	 */
+	public static function donate_notice() {
+		if ( ! self::is_plugin_screen() || ! current_user_can( OLI_ACR_CAP ) ) {
+			return;
+		}
+		if ( get_user_meta( get_current_user_id(), 'oli_acr_donate_dismissed', true ) ) {
+			return;
+		}
+		?>
+		<div class="notice notice-info is-dismissible oli-acr-donate-notice">
+			<p>
+				<?php
+				echo wp_kses(
+					sprintf(
+						/* translators: %s: donate URL */
+						__( 'Enjoying Oli Abandoned Cart Recovery? <a href="%s" target="_blank" rel="noopener noreferrer">Buy me a coffee</a> — your support keeps the plugin free and maintained.', 'oli-abandoned-cart-recovery' ),
+						esc_url( OLI_ACR_DONATE_URL )
+					),
+					array(
+						'a' => array(
+							'href'   => true,
+							'target' => true,
+							'rel'    => true,
+						),
+					)
+				);
+				?>
+			</p>
+		</div>
+		<script>
+		(function () {
+			var notice = document.querySelector('.oli-acr-donate-notice');
+			if (!notice || typeof oliAcrAdmin === 'undefined') return;
+			notice.addEventListener('click', function (e) {
+				if (!e.target.classList.contains('notice-dismiss')) return;
+				var body = new FormData();
+				body.append('action', 'oli_acr_dismiss_donate');
+				body.append('nonce', oliAcrAdmin.donateNonce || '');
+				if (window.fetch) {
+					fetch(oliAcrAdmin.ajaxUrl || (typeof ajaxurl !== 'undefined' ? ajaxurl : ''), { method: 'POST', body: body, credentials: 'same-origin' });
+				}
+			});
+		})();
+		</script>
+		<?php
+	}
+
+	/**
+	 * Mémorise le rejet de l'avis Donate pour l'utilisateur courant.
+	 *
+	 * @return void
+	 */
+	public static function ajax_dismiss_donate() {
+		check_ajax_referer( 'oli_acr_donate', 'nonce' );
+		if ( ! current_user_can( OLI_ACR_CAP ) ) {
+			wp_send_json_error( null, 403 );
+		}
+		update_user_meta( get_current_user_id(), 'oli_acr_donate_dismissed', 1 );
+		wp_send_json_success();
 	}
 
 	/**
@@ -124,6 +209,8 @@ class OLI_ACR_Admin {
 			'oliAcrAdmin',
 			array(
 				'confirmDeleteTemplate' => __( 'Delete this template?', 'oli-abandoned-cart-recovery' ),
+				'ajaxUrl'               => admin_url( 'admin-ajax.php' ),
+				'donateNonce'           => wp_create_nonce( 'oli_acr_donate' ),
 			)
 		);
 	}
@@ -219,6 +306,22 @@ class OLI_ACR_Admin {
 			default:
 				self::render_dashboard();
 		}
+		echo '<p class="description" style="margin-top:20px;">';
+		echo wp_kses(
+			sprintf(
+				/* translators: %s: donate URL */
+				__( 'If this plugin helps you, please consider a <a href="%s" target="_blank" rel="noopener noreferrer">donation</a>. Thank you!', 'oli-abandoned-cart-recovery' ),
+				esc_url( OLI_ACR_DONATE_URL )
+			),
+			array(
+				'a' => array(
+					'href'   => true,
+					'target' => true,
+					'rel'    => true,
+				),
+			)
+		);
+		echo '</p>';
 		echo '</div>';
 	}
 
